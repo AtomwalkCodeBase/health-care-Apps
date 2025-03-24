@@ -1,171 +1,306 @@
-import React, { useContext, useState, useEffect } from 'react';
-import { View, Text, FlatList, Dimensions } from 'react-native';
-import styled from 'styled-components/native';
-import InfoCard from '../components/InfoCard';
-import { AppContext } from '../../context/AppContext';
-import { getCompanyInfo, getProfileInfo } from '../services/authServices';
-import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Image,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 
+// Services list
+const serviceList = [
+  { name: "Dentistry", icon: "tooth-outline" },
+  { name: "Neurology", icon: "brain" },
+  { name: "Cardiology", icon: "heart-pulse" },
+  { name: "Orthopedics", icon: "walk" },
+  { name: "Dermatology", icon: "face-woman-outline" },
+  { name: "Pediatrics", icon: "baby-face-outline" },
+  { name: "Radiology", icon: "radiology-box" },
+  { name: "Psychiatry", icon: "emoticon-outline" },
+  { name: "Ophthalmology", icon: "eye-outline" },
+  { name: "Gynecology", icon: "gender-female" },
+  { name: "ENT (Otolaryngology)", icon: "ear-hearing" },
+  { name: "Gastroenterology", icon: "stomach" },
+  { name: "Urology", icon: "water" },
+  { name: "Pulmonology", icon: "lungs" },
+  { name: "Oncology", icon: "ribbon" },
+  { name: "Nephrology", icon: "kidney" },
+];
 
-const { width, height } = Dimensions.get('window');
+// Doctors list
+const doctorList = [
+  {
+    name: "Dr. Hamza Tariq",
+    specialty: "Odontology",
+    time: "10:30 AM - 3:30 PM",
+    fee: "1000/-",
+    rating: 4.9,
+    image: { uri: "https://randomuser.me/api/portraits/men/1.jpg" },
+  },
+  {
+    name: "Dr. Alina Fatima",
+    specialty: "Senior Surgeon",
+    time: "10:30 AM - 3:30 PM",
+    fee: "1500/-",
+    rating: 5.0,
+    image: { uri: "https://randomuser.me/api/portraits/women/2.jpg" },
+  },
+  {
+    name: "Dr. John Doe",
+    specialty: "Cardiologist",
+    time: "9:00 AM - 1:00 PM",
+    fee: "500/-",
+    rating: 4.8,
+    image: { uri: "https://randomuser.me/api/portraits/men/4.jpg" },
+  },
+];
 
+const HomeScreen = () => {
+  const [searchText, setSearchText] = useState("");
+  const [filteredDoctors, setFilteredDoctors] = useState(doctorList);
+  const [filteredServices, setFilteredServices] = useState(serviceList);
+  const [isAscending, setIsAscending] = useState(true);
 
-const Container = styled.View`
-  background-color: #f5f5f5;
-`;
+  const handleSearch = (text) => {
+    const lowerText = text.toLowerCase();
 
-const GradientBackground = styled(LinearGradient).attrs({
-  colors: ['#c2e9fb', '#ffdde1'], // Top to bottom gradient
-  start: { x: 0, y: 0 },
-  end: { x: 1, y: 1 },
-})`
-  /* flex: 1; */
-  align-items: center;
-  /* padding: 20px; */
-  height:100%;
-`;
+    const matchedDoctors = doctorList.filter(
+      (doc) =>
+        doc.name.toLowerCase().includes(lowerText) ||
+        doc.specialty.toLowerCase().includes(lowerText)
+    );
 
-const LogoContainer = styled.View`
-  width: ${width * 0.25}px;
-  height: ${width * 0.25}px;
-  background-color: #ffffff;
-  border-radius: ${width * 0.25}px;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 15px;
-  margin-top: 5%;
-`;
+    const matchedServices = serviceList.filter((service) =>
+      service.name.toLowerCase().includes(lowerText)
+    );
 
-const Logo = styled.Image.attrs(() => ({
-  resizeMode: 'contain',  // Cover ensures the image fills the container
-}))`
-  width: 95%;
-  height: 95%;
-  border-radius: ${width * 0.35}px;  /* Ensures the image respects the circular shape */
-`;
+    const sortedDoctors = [...matchedDoctors].sort((a, b) => {
+      if (isAscending) {
+        return a.name.localeCompare(b.name);
+      } else {
+        return b.name.localeCompare(a.name);
+      }
+    });
 
-// Header styles
-const CompanyName = styled.Text`
-  font-size: 22px;
-  font-weight: bold;
-  margin: 10px 0;
-  color: #333333;
-`;
+    setFilteredDoctors(sortedDoctors);
+    setFilteredServices(matchedServices);
+  };
 
-const SubHeader = styled.Text`
-  font-size: 16px;
-  margin-bottom: 20px;
-  color: #555555;
-`;
-
-// Activity List
-const ActivityContainer = styled.View`
-  width: 100%;
-  margin-top: 20px;
-  padding: 20px;
-`;
-
-const ActivityRow = styled.View`
-  flex-direction: row;
-  justify-content: space-between;
-  padding: 12px 16px;
-  background-color: #ffffff;
-  margin-bottom: 5px;
-  border-radius: 10px;
-  elevation: 2;
-`;
-
-const ActivityText = styled.Text`
-  font-size: 14px;
-  color: #333333;
-`;
-
-const StatusText = styled.Text`
-  font-size: 14px;
-  font-weight: bold;
-  color: #e63946;
-`;
-
-const Row = styled.View`
-  flex-direction: row;
-  justify-content: center;
-  width: 100%;
-  margin-bottom: 10px;
-`;
-
-// Main App Component
-const HomePage = () => {
-  const { userToken } = useContext(AppContext);
-  const [company, setCompany] = useState({});
-  const [loading, setLoading] = useState(false);
+  const toggleSortOrder = () => {
+    setIsAscending(!isAscending);
+  };
 
   useEffect(() => {
-    setLoading(true);
-    getCompanyInfo()
-      .then((res) => {
-        setCompany(res.data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
-
-  const activities = [
-    { id: '1', reference: 'PROJECT-2021-00002', status: 'IN PROGRESS' },
-    { id: '2', reference: 'PROJECT-2023-00004', status: 'IN PROGRESS' },
-    { id: '3', reference: 'PTAX-2020-00005', status: 'IN PROGRESS' },
-  ];
+    handleSearch(searchText);
+  }, [searchText, isAscending]);
 
   return (
-    <Container>
-      <StatusBar barStyle="light-content" backgroundColor="#a970ff" />
-    <GradientBackground>
-      {/* Logo */}
-        <LogoContainer>
-          <Logo source={{ uri: company.image || 'https://via.placeholder.com/150' }} />
-        </LogoContainer>
-        <CompanyName>{company.name || 'Atomwalk Technologies'}</CompanyName>
-
-      {/* <Header>ATOMWALK TECHNOLOGIES</Header> */}
-      <SubHeader>Welcome to Atomwalk Office!</SubHeader>
-
-      {/* <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
-        <InfoCard number="3" label="Project Activities" gradientColors={['#007bff', '#00c6ff']} />
-        <InfoCard number="0" label="Reviews" gradientColors={['#6dd5ed', '#2193b0']} />
-        <InfoCard number="1" label="Completed Activities" gradientColors={['#38ef7d', '#11998e']} />
-        <InfoCard number="2" label="Pending/On Hold" gradientColors={['#f09819', '#ff512f']} />
-        <InfoCard number="2" label="Over Due Activities" gradientColors={['#e52d27', '#b31217']} />
-      </View> */}
-
-      {/* Cards Layout */}
-      <Row>
-          <InfoCard number="3" label="Project Activities" gradientColors={['#007bff', '#00c6ff']} />
-          <InfoCard number="0" label="Reviews" gradientColors={['#6dd5ed', '#2193b0']} />
-        </Row>
-
-        <Row>
-          <InfoCard number="1" label="Completed Activities" gradientColors={['#38ef7d', '#11998e']} />
-          <InfoCard number="2" label="Pending/On Hold" gradientColors={['#f09819', '#ff512f']} />
-          <InfoCard number="2" label="Over Due Activities" gradientColors={['#e52d27', '#b31217']} />
-        </Row>
-
-      {/* Activity List */}
-      <ActivityContainer>
-        <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>Activity Reference</Text>
-        <FlatList
-          data={activities}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ActivityRow>
-              <ActivityText>{item.reference}</ActivityText>
-              <StatusText>{item.status}</StatusText>
-            </ActivityRow>
-          )}
+    <ScrollView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Image
+          source={{ uri: "https://randomuser.me/api/portraits/men/4.jpg" }}
+          style={styles.profileImage}
         />
-      </ActivityContainer>
-    </GradientBackground>
-    </Container>
+        <Text style={styles.greeting}>
+          Hello <Text style={styles.userName}>Hamza!</Text>
+        </Text>
+        <MaterialCommunityIcons
+          name="bell-outline"
+          size={24}
+          color="#000"
+          style={styles.notificationIcon}
+        />
+      </View>
+
+      {/* Search */}
+      <View style={styles.searchContainer}>
+        <MaterialCommunityIcons name="magnify" size={22} color="gray" />
+        <TextInput
+          placeholder="Search doctors or services"
+          style={styles.searchInput}
+          value={searchText}
+          onChangeText={(text) => setSearchText(text)}
+        />
+        <TouchableOpacity onPress={toggleSortOrder}>
+          <MaterialCommunityIcons
+            name={
+              isAscending
+                ? "sort-alphabetical-ascending"
+                : "sort-alphabetical-descending"
+            }
+            size={22}
+            color="#000"
+            style={styles.filterIcon}
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Services */}
+      <Text style={styles.sectionTitle}>Services</Text>
+      {filteredServices.length === 0 ? (
+        <Text style={styles.noResultsText}>No services found</Text>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {filteredServices.map((service, index) => (
+            <TouchableOpacity key={index} style={styles.serviceCard}>
+              <MaterialCommunityIcons
+                name={service.icon}
+                size={30}
+                color="#fff"
+              />
+              <Text style={styles.serviceText}>{service.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* Doctors */}
+      <Text style={styles.sectionTitle}>Top Rated Doctors</Text>
+      <View style={styles.verticalList}>
+        {filteredDoctors.length === 0 ? (
+          <Text style={styles.noResultsText}>No doctors found</Text>
+        ) : (
+          filteredDoctors.map((doctor, index) => (
+            <TouchableOpacity key={index} style={styles.doctorCard}>
+              <Image source={doctor.image} style={styles.doctorImage} />
+              <View style={styles.doctorInfo}>
+                <Text style={styles.doctorName}>{doctor.name}</Text>
+                <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
+                <Text style={styles.doctorDetails}>
+                  ⏰ {doctor.time} | Fee: {doctor.fee}
+                </Text>
+              </View>
+              <Text style={styles.rating}>⭐ {doctor.rating}</Text>
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
+    </ScrollView>
   );
 };
 
-export default HomePage;
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 20,
+    paddingTop: 40,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  profileImage: {
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+  },
+  greeting: {
+    fontSize: 20,
+    fontWeight: "600",
+    flex: 1,
+    marginLeft: 15,
+  },
+  userName: {
+    color: "#3B82F6",
+  },
+  notificationIcon: {
+    marginLeft: 10,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f1f1f1",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 20,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 16,
+  },
+  filterIcon: {
+    marginLeft: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginTop: 10,
+  },
+  serviceCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#3B82F6",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginTop: 10,
+    marginRight: 12,
+  },
+  serviceText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+    marginLeft: 8,
+  },
+  verticalList: {
+    marginTop: 15,
+    marginBottom: 15,
+  },
+  doctorCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f9f9f9",
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 12,
+    elevation: 1,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+  },
+  doctorImage: {
+    width: 55,
+    height: 55,
+    borderRadius: 30,
+    marginRight: 15,
+  },
+  doctorInfo: {
+    flex: 1,
+  },
+  doctorName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 2,
+  },
+  doctorSpecialty: {
+    color: "gray",
+    fontSize: 14,
+    marginBottom: 3,
+  },
+  doctorDetails: {
+    fontSize: 13,
+    color: "gray",
+  },
+  rating: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#FFD700",
+  },
+  noResultsText: {
+    fontSize: 14,
+    color: "gray",
+    fontStyle: "italic",
+    marginVertical: 10,
+  },
+});
+
+export default HomeScreen;

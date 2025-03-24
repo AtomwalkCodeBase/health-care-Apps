@@ -29,7 +29,7 @@ const NumberText = styled.Text`
 `;
 
 const LabelText = styled.Text`
-  font-size: 12px;
+  font-size: 11px;
   color: #ffffff;
   margin-top: 4px;
   font-weight: 600;
