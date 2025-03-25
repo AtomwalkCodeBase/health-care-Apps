@@ -27,7 +27,7 @@ const serviceList = [
   { name: "Urology", icon: "water" },
   { name: "Pulmonology", icon: "lungs" },
   { name: "Oncology", icon: "ribbon" },
-  { name: "Nephrology", icon: "kidney" },
+  { name: "Nephrology", icon: "heart" },
 ];
 
 // Doctors list
