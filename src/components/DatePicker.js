@@ -41,7 +41,7 @@ const DatePicker = ({ error, label, cDate, setCDate }) => {
       <Label>{label}</Label>
       <DatePickerButton onPress={() => setShowDatePicker(true)}>
         <DateText>{cDate.toDateString()}</DateText>
-        <Icon source={require('../../assets/images/c-icon.png')} />
+        <Icon source={require('../../assets/images/back_icon.png')} />
       </DatePickerButton>
       {showDatePicker && (
         <DateTimePicker

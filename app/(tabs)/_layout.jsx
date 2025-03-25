@@ -16,22 +16,10 @@ const _layout = () => {
           ),
         }}
       />
-
-      <Tabs.Screen
-        name="doctor"
-        options={{
-          title: "Doctor Profile",
-          headerShown: false,
-          tabBarIcon: ({ color }) => (
-            <Ionicons name="medkit-outline" size={24} color={color} />
-          ),
-        }}
-      />
-
       <Tabs.Screen
         name="book"
         options={{
-          title: "Appoinment",
+          title: "My Appoinment",
           headerShown: false,
           tabBarIcon: ({ color }) => (
             <Ionicons name="calendar-outline" size={24} color={color} />

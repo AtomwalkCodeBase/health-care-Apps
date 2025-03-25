@@ -11,11 +11,13 @@ import {
 import { Ionicons, FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams } from "expo-router";
 
 const DoctorProfile = () => {
   const navigation = useNavigation();
   const [expanded, setExpanded] = useState(false);
   const [liked, setLiked] = useState(false);
+  const item=useLocalSearchParams();
 
   const handleBook = () => {
     Alert.alert("Appointment Booked", "Your appointment has been confirmed.");
@@ -47,7 +49,7 @@ const DoctorProfile = () => {
 
         {/* Name and Rating */}
         <View style={styles.nameRatingSection}>
-          <Text style={styles.name}>Dr. Ali Uzair</Text>
+          <Text style={styles.name}>{item.name}</Text>
           <Text style={styles.speciality}>Cardiologist and Surgeon</Text>
           <View style={styles.ratingContainer}>
             <FontAwesome name="star" size={16} color="#FDC500" />

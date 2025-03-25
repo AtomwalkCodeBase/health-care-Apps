@@ -1,16 +1,17 @@
-import { View, Text } from "react-native";
+import { StatusBar } from "react-native";
 import React from "react";
-import HomeScreen from "../../src/screens/HomeScreen";
 import { SafeAreaView } from "react-native-safe-area-context";
+import HomeScreen from "../../src/screens/HomeScreen";
 import PinPopup from "../../src/screens/PinPopup";
 
-const home = () => {
+const Home = () => {
   return (
-    <SafeAreaView>
+    <SafeAreaView style={{ flex: 1 }}>
       <HomeScreen />
-      <PinPopup></PinPopup>
+      <PinPopup />
+      <StatusBar style="auto" />
     </SafeAreaView>
   );
 };
 
-export default home;
+export default Home;

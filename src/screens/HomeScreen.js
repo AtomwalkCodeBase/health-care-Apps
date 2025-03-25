@@ -1,22 +1,47 @@
-import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   TextInput,
   Image,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   StyleSheet,
+  Dimensions,
+  ScrollView,
 } from "react-native";
+import { router } from "expo-router";
+import React, { useState, useEffect, useMemo } from "react";
+import { getProfileInfo } from "../services/authServices";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 
-// Services list
+// Constants
+const COLORS = {
+  primary: "#3B82F6",
+  background: "#fff",
+  text: "#333",
+  secondaryText: "#666",
+  rating: "#FFD700",
+};
+
+const STRINGS = {
+  greeting: (name) => {
+    const parts = name?.split(" ") || [];
+    return `Hello ${parts.length > 1 ? parts[1] : parts[0] || "User"}`;
+  },
+  searchPlaceholder: "Search doctors or services",
+  servicesTitle: "Services",
+  doctorsTitle: "Top Rated Doctors",
+  noServices: "No services found!",
+  noDoctors: "No doctors found!",
+  bookNow: "Book Now!",
+};
+
+// Services list with validated icons
 const serviceList = [
   { name: "Dentistry", icon: "tooth-outline" },
   { name: "Neurology", icon: "brain" },
   { name: "Cardiology", icon: "heart-pulse" },
   { name: "Orthopedics", icon: "walk" },
-  { name: "Dermatology", icon: "face-woman-outline" },
   { name: "Pediatrics", icon: "baby-face-outline" },
   { name: "Radiology", icon: "radiology-box" },
   { name: "Psychiatry", icon: "emoticon-outline" },
@@ -27,20 +52,21 @@ const serviceList = [
   { name: "Urology", icon: "water" },
   { name: "Pulmonology", icon: "lungs" },
   { name: "Oncology", icon: "ribbon" },
-  { name: "Nephrology", icon: "heart" },
 ];
 
-// Doctors list
+// Doctors list with unique IDs
 const doctorList = [
   {
+    id: 1,
     name: "Dr. Hamza Tariq",
     specialty: "Odontology",
     time: "10:30 AM - 3:30 PM",
     fee: "1000/-",
-    rating: 4.9,
+    rating: 4.5,
     image: { uri: "https://randomuser.me/api/portraits/men/1.jpg" },
   },
   {
+    id: 2,
     name: "Dr. Alina Fatima",
     specialty: "Senior Surgeon",
     time: "10:30 AM - 3:30 PM",
@@ -49,6 +75,7 @@ const doctorList = [
     image: { uri: "https://randomuser.me/api/portraits/women/2.jpg" },
   },
   {
+    id: 3,
     name: "Dr. John Doe",
     specialty: "Cardiologist",
     time: "9:00 AM - 1:00 PM",
@@ -56,76 +83,125 @@ const doctorList = [
     rating: 4.8,
     image: { uri: "https://randomuser.me/api/portraits/men/4.jpg" },
   },
+  {
+    id: 4,
+    name: "Dr. Sarah Smith",
+    specialty: "Pediatrician",
+    time: "8:00 AM - 12:00 PM",
+    fee: "1200/-",
+    rating: 4.9,
+    image: { uri: "https://randomuser.me/api/portraits/women/3.jpg" },
+  },
 ];
 
 const HomeScreen = () => {
+  const [profile, setProfile] = useState({});
   const [searchText, setSearchText] = useState("");
-  const [filteredDoctors, setFilteredDoctors] = useState(doctorList);
-  const [filteredServices, setFilteredServices] = useState(serviceList);
   const [isAscending, setIsAscending] = useState(true);
 
-  const handleSearch = (text) => {
-    const lowerText = text.toLowerCase();
+  useEffect(() => {
+    getProfileInfo()
+      .then((res) => setProfile(res.data))
+      .catch((error) => console.error("Profile load failed:", error));
+  }, []);
 
-    const matchedDoctors = doctorList.filter(
-      (doc) =>
-        doc.name.toLowerCase().includes(lowerText) ||
-        doc.specialty.toLowerCase().includes(lowerText)
-    );
+  const { filteredServices, filteredDoctors } = useMemo(() => {
+    const lowerText = searchText.toLowerCase();
 
     const matchedServices = serviceList.filter((service) =>
       service.name.toLowerCase().includes(lowerText)
     );
 
-    const sortedDoctors = [...matchedDoctors].sort((a, b) => {
-      if (isAscending) {
-        return a.name.localeCompare(b.name);
-      } else {
-        return b.name.localeCompare(a.name);
-      }
-    });
+    const matchedDoctors = doctorList
+      .filter(
+        (doc) =>
+          doc.name.toLowerCase().includes(lowerText) ||
+          doc.specialty.toLowerCase().includes(lowerText)
+      )
+      .sort((a, b) =>
+        isAscending
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name)
+      );
 
-    setFilteredDoctors(sortedDoctors);
-    setFilteredServices(matchedServices);
-  };
-
-  const toggleSortOrder = () => {
-    setIsAscending(!isAscending);
-  };
-
-  useEffect(() => {
-    handleSearch(searchText);
+    return {
+      filteredServices: matchedServices,
+      filteredDoctors: matchedDoctors,
+    };
   }, [searchText, isAscending]);
 
-  return (
-    <ScrollView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Image
-          source={{ uri: "https://randomuser.me/api/portraits/men/4.jpg" }}
-          style={styles.profileImage}
-        />
-        <Text style={styles.greeting}>
-          Hello <Text style={styles.userName}>Hamza!</Text>
-        </Text>
-        <MaterialCommunityIcons
-          name="bell-outline"
-          size={24}
-          color="#000"
-          style={styles.notificationIcon}
-        />
-      </View>
+  const toggleSortOrder = () => setIsAscending(!isAscending);
 
-      {/* Search */}
+  const handleDoctorPress = (name) => {
+    router.push({
+      pathname: "/DoctorDetails",
+      params: {
+        name: name,
+      },
+    });
+  };
+
+  const handleBookNow = () => router.push("/BookingAppointment");
+
+  const ServiceCard = ({ item }) => (
+    <TouchableOpacity style={styles.serviceCard}>
+      <MaterialCommunityIcons
+        name={item.icon}
+        size={30}
+        color="#fff"
+        style={styles.serviceIcon}
+      />
+      <Text style={styles.serviceText}>{item.name}</Text>
+    </TouchableOpacity>
+  );
+
+  const DoctorCard = ({ item }) => (
+    <TouchableOpacity
+      style={styles.doctorCard}
+      onPress={() => handleDoctorPress(item.name)}
+    >
+      <Image source={item.image} style={styles.doctorImage} />
+      <View style={styles.doctorInfo}>
+        <Text style={styles.doctorName}>{item.name}</Text>
+        <Text style={styles.doctorSpecialty}>{item.specialty}</Text>
+        <Text style={styles.doctorDetails}>
+          ⏰ {item.time} | Fee: {item.fee}
+        </Text>
+      </View>
+      <Text style={styles.rating}>⭐ {item.rating}</Text>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Image source={{ uri: profile?.image }} style={styles.profileImage} />
+          <Text style={styles.greeting}>
+            {STRINGS.greeting(profile?.emp_data?.name)}
+          </Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            onPress={handleBookNow}
+            style={styles.bookNowButton}
+          >
+            <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+            <Text style={styles.bookNowText}>{STRINGS.bookNow}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      {/* Search Section */}
       <View style={styles.searchContainer}>
         <MaterialCommunityIcons name="magnify" size={22} color="gray" />
         <TextInput
-          placeholder="Search doctors or services"
+          placeholder={STRINGS.searchPlaceholder}
           style={styles.searchInput}
           value={searchText}
-          onChangeText={(text) => setSearchText(text)}
+          onChangeText={setSearchText}
+          placeholderTextColor="#999"
         />
-        <TouchableOpacity onPress={toggleSortOrder}>
+        <TouchableOpacity onPress={toggleSortOrder} style={styles.filterButton}>
           <MaterialCommunityIcons
             name={
               isAscending
@@ -133,116 +209,130 @@ const HomeScreen = () => {
                 : "sort-alphabetical-descending"
             }
             size={22}
-            color="#000"
-            style={styles.filterIcon}
+            color="gray"
           />
         </TouchableOpacity>
       </View>
 
-      {/* Services */}
-      <Text style={styles.sectionTitle}>Services</Text>
-      {filteredServices.length === 0 ? (
-        <Text style={styles.noResultsText}>No services found</Text>
-      ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {filteredServices.map((service, index) => (
-            <TouchableOpacity key={index} style={styles.serviceCard}>
-              <MaterialCommunityIcons
-                name={service.icon}
-                size={30}
-                color="#fff"
-              />
-              <Text style={styles.serviceText}>{service.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
+      {/* Services Section */}
+      <ScrollView>
+        <Text style={styles.sectionTitle}>{STRINGS.servicesTitle}</Text>
+        <FlatList
+          horizontal
+          data={filteredServices}
+          renderItem={({ item }) => <ServiceCard item={item} />}
+          keyExtractor={(item) => item.name}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.servicesContainer}
+        />
 
-      {/* Doctors */}
-      <Text style={styles.sectionTitle}>Top Rated Doctors</Text>
-      <View style={styles.verticalList}>
+        {/* Doctors Section */}
+        <Text style={styles.sectionTitle}>{STRINGS.doctorsTitle}</Text>
         {filteredDoctors.length === 0 ? (
-          <Text style={styles.noResultsText}>No doctors found</Text>
+          <Text style={styles.noResultsText}>{STRINGS.noDoctors}</Text>
         ) : (
-          filteredDoctors.map((doctor, index) => (
-            <TouchableOpacity key={index} style={styles.doctorCard}>
-              <Image source={doctor.image} style={styles.doctorImage} />
-              <View style={styles.doctorInfo}>
-                <Text style={styles.doctorName}>{doctor.name}</Text>
-                <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
-                <Text style={styles.doctorDetails}>
-                  ⏰ {doctor.time} | Fee: {doctor.fee}
-                </Text>
-              </View>
-              <Text style={styles.rating}>⭐ {doctor.rating}</Text>
-            </TouchableOpacity>
-          ))
+          <FlatList
+            data={filteredDoctors}
+            renderItem={({ item }) => <DoctorCard item={item} />}
+            keyExtractor={(item) => item.id.toString()}
+            scrollEnabled={false}
+            contentContainerStyle={styles.verticalList}
+          />
         )}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
+// Styles
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 20,
-    paddingTop: 40,
+    flex: 1,
+    paddingTop: 20,
+    paddingHorizontal: 25,
+    backgroundColor: COLORS.background,
   },
   header: {
+    marginBottom: 10,
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "#fff",
     justifyContent: "space-between",
-    marginBottom: 20,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   profileImage: {
-    borderRadius: 25,
     width: 50,
     height: 50,
+    borderRadius: 25,
   },
   greeting: {
     fontSize: 20,
     fontWeight: "600",
-    flex: 1,
     marginLeft: 15,
+    color: COLORS.text,
   },
-  userName: {
-    color: "#3B82F6",
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
-  notificationIcon: {
-    marginLeft: 10,
+  bookNowButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.primary,
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  bookNowText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+    marginLeft: 5,
   },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#f1f1f1",
     borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    padding: 12,
     marginBottom: 20,
   },
   searchInput: {
     flex: 1,
     marginLeft: 10,
     fontSize: 16,
+    color: COLORS.text,
   },
-  filterIcon: {
-    marginLeft: 8,
+  sortButton: {
+    marginLeft: 10,
+    padding: 5,
+  },
+  sortText: {
+    color: COLORS.primary,
+    fontWeight: "500",
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
-    marginTop: 10,
+    marginVertical: 10,
+    color: COLORS.text,
+  },
+  servicesContainer: {
+    paddingBottom: 10,
   },
   serviceCard: {
+    width: Dimensions.get("window").width * 0.4,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#3B82F6",
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginTop: 10,
+    padding: 12,
     marginRight: 12,
+    minHeight: 80,
   },
   serviceText: {
     color: "#fff",
@@ -251,8 +341,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   verticalList: {
-    marginTop: 15,
-    marginBottom: 15,
+    marginBottom: 30,
   },
   doctorCard: {
     flexDirection: "row",
@@ -261,11 +350,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 15,
     marginBottom: 12,
-    elevation: 1,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
   },
   doctorImage: {
     width: 55,
@@ -279,27 +363,29 @@ const styles = StyleSheet.create({
   doctorName: {
     fontSize: 16,
     fontWeight: "bold",
+    color: COLORS.text,
     marginBottom: 2,
   },
   doctorSpecialty: {
-    color: "gray",
+    color: COLORS.secondaryText,
     fontSize: 14,
     marginBottom: 3,
   },
   doctorDetails: {
     fontSize: 13,
-    color: "gray",
+    color: COLORS.secondaryText,
   },
   rating: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#FFD700",
+    color: COLORS.rating,
   },
   noResultsText: {
     fontSize: 14,
-    color: "gray",
+    color: COLORS.secondaryText,
     fontStyle: "italic",
-    marginVertical: 10,
+    textAlign: "center",
+    marginVertical: 20,
   },
 });
 
