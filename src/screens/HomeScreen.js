@@ -92,6 +92,24 @@ const doctorList = [
     rating: 4.9,
     image: { uri: "https://randomuser.me/api/portraits/women/3.jpg" },
   },
+  {
+    id: 5,
+    name: "Dr. Sarah Smith",
+    specialty: "Pediatrician",
+    time: "8:00 AM - 12:00 PM",
+    fee: "1200/-",
+    rating: 4.9,
+    image: { uri: "https://randomuser.me/api/portraits/women/3.jpg" },
+  },
+  {
+    id: 6,
+    name: "Dr. Sarah Smith",
+    specialty: "Pediatrician",
+    time: "8:00 AM - 12:00 PM",
+    fee: "1200/-",
+    rating: 4.9,
+    image: { uri: "https://randomuser.me/api/portraits/women/3.jpg" },
+  },
 ];
 
 const HomeScreen = () => {
@@ -215,7 +233,9 @@ const HomeScreen = () => {
       </View>
 
       {/* Services Section */}
-      <ScrollView>
+      <ScrollView 
+      showsVerticalScrollIndicator={false} 
+      showsHorizontalScrollIndicator={false}>
         <Text style={styles.sectionTitle}>{STRINGS.servicesTitle}</Text>
         <FlatList
           horizontal
@@ -223,6 +243,7 @@ const HomeScreen = () => {
           renderItem={({ item }) => <ServiceCard item={item} />}
           keyExtractor={(item) => item.name}
           showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.servicesContainer}
         />
 
@@ -237,6 +258,8 @@ const HomeScreen = () => {
             keyExtractor={(item) => item.id.toString()}
             scrollEnabled={false}
             contentContainerStyle={styles.verticalList}
+             showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
           />
         )}
       </ScrollView>
