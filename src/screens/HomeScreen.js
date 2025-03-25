@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -27,7 +28,6 @@ const serviceList = [
   { name: "Urology", icon: "water" },
   { name: "Pulmonology", icon: "lungs" },
   { name: "Oncology", icon: "ribbon" },
-  { name: "Nephrology", icon: "kidney" },
 ];
 
 // Doctors list
@@ -37,7 +37,7 @@ const doctorList = [
     specialty: "Odontology",
     time: "10:30 AM - 3:30 PM",
     fee: "1000/-",
-    rating: 4.9,
+    rating: 4.5,
     image: { uri: "https://randomuser.me/api/portraits/men/1.jpg" },
   },
   {
@@ -47,6 +47,30 @@ const doctorList = [
     fee: "1500/-",
     rating: 5.0,
     image: { uri: "https://randomuser.me/api/portraits/women/2.jpg" },
+  },
+  {
+    name: "Dr. John Doe",
+    specialty: "Cardiologist",
+    time: "9:00 AM - 1:00 PM",
+    fee: "500/-",
+    rating: 4.8,
+    image: { uri: "https://randomuser.me/api/portraits/men/4.jpg" },
+  },
+  {
+    name: "Dr. John Doe",
+    specialty: "Cardiologist",
+    time: "9:00 AM - 1:00 PM",
+    fee: "500/-",
+    rating: 4.8,
+    image: { uri: "https://randomuser.me/api/portraits/men/4.jpg" },
+  },
+  {
+    name: "Dr. John Doe",
+    specialty: "Cardiologist",
+    time: "9:00 AM - 1:00 PM",
+    fee: "500/-",
+    rating: 4.8,
+    image: { uri: "https://randomuser.me/api/portraits/men/4.jpg" },
   },
   {
     name: "Dr. John Doe",
@@ -73,9 +97,9 @@ const HomeScreen = () => {
         doc.specialty.toLowerCase().includes(lowerText)
     );
 
-    const matchedServices = serviceList.filter((service) =>
-      service.name.toLowerCase().includes(lowerText)
-    );
+    // const matchedServices = serviceList.filter((service) =>
+    //   service.name.toLowerCase().includes(lowerText)
+    // );
 
     const sortedDoctors = [...matchedDoctors].sort((a, b) => {
       if (isAscending) {
@@ -86,34 +110,54 @@ const HomeScreen = () => {
     });
 
     setFilteredDoctors(sortedDoctors);
-    setFilteredServices(matchedServices);
+    // setFilteredServices(matchedServices);
   };
 
   const toggleSortOrder = () => {
     setIsAscending(!isAscending);
   };
 
+  const handledoctor = (name) => {
+    router.push({
+       pathname:'/DoctorDetails' ,
+       params:{
+        name:name 
+      }
+      });
+  };
+
   useEffect(() => {
     handleSearch(searchText);
   }, [searchText, isAscending]);
-
+const booknow =()=>{
+  router.push({
+    pathname:'/BookingAppointment' });
+}
   return (
     <ScrollView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Image
-          source={{ uri: "https://randomuser.me/api/portraits/men/4.jpg" }}
-          style={styles.profileImage}
-        />
-        <Text style={styles.greeting}>
-          Hello <Text style={styles.userName}>Hamza!</Text>
-        </Text>
-        <MaterialCommunityIcons
-          name="bell-outline"
-          size={24}
-          color="#000"
-          style={styles.notificationIcon}
-        />
+        <View style={styles.headerLeft}>
+          <Image
+            source={{ uri: "https://randomuser.me/api/portraits/men/4.jpg" }}
+            style={styles.profileImage}
+          />
+          <Text style={styles.greeting}>
+            Hello <Text style={styles.userName}>Hamza!</Text>
+          </Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={booknow} style={styles.bookNowButton}>
+            <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+            <Text style={styles.bookNowText}>Book Now!</Text>
+          </TouchableOpacity>
+          <MaterialCommunityIcons
+            name="bell-outline"
+            size={24}
+            color="#000"
+            style={styles.notificationIcon}
+          />
+        </View>
       </View>
 
       {/* Search */}
@@ -165,7 +209,7 @@ const HomeScreen = () => {
           <Text style={styles.noResultsText}>No doctors found</Text>
         ) : (
           filteredDoctors.map((doctor, index) => (
-            <TouchableOpacity key={index} style={styles.doctorCard}>
+            <TouchableOpacity onPress={()=>handledoctor(doctor.name)} key={index} style={styles.doctorCard}>
               <Image source={doctor.image} style={styles.doctorImage} />
               <View style={styles.doctorInfo}>
                 <Text style={styles.doctorName}>{doctor.name}</Text>
@@ -195,6 +239,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 20,
   },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   profileImage: {
     borderRadius: 25,
     width: 50,
@@ -203,14 +255,33 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 20,
     fontWeight: "600",
-    flex: 1,
     marginLeft: 15,
   },
   userName: {
     color: "#3B82F6",
   },
+  bookNowButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#3B82F6',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginRight: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  bookNowText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 5,
+  },
   notificationIcon: {
-    marginLeft: 10,
+    marginLeft: 5,
   },
   searchContainer: {
     flexDirection: "row",
@@ -233,6 +304,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     marginTop: 10,
+    marginBottom: 5,
+    color: '#333',
   },
   serviceCard: {
     flexDirection: "row",
@@ -243,6 +316,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginTop: 10,
     marginRight: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   serviceText: {
     color: "#fff",
@@ -252,7 +330,7 @@ const styles = StyleSheet.create({
   },
   verticalList: {
     marginTop: 15,
-    marginBottom: 15,
+    marginBottom: 30,
   },
   doctorCard: {
     flexDirection: "row",
@@ -261,10 +339,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 15,
     marginBottom: 12,
-    elevation: 1,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
+    elevation: 2,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 4,
   },
   doctorImage: {
@@ -280,15 +358,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 2,
+    color: '#333',
   },
   doctorSpecialty: {
-    color: "gray",
+    color: "#666",
     fontSize: 14,
     marginBottom: 3,
   },
   doctorDetails: {
     fontSize: 13,
-    color: "gray",
+    color: "#666",
   },
   rating: {
     fontSize: 16,
@@ -297,9 +376,10 @@ const styles = StyleSheet.create({
   },
   noResultsText: {
     fontSize: 14,
-    color: "gray",
+    color: "#666",
     fontStyle: "italic",
     marginVertical: 10,
+    textAlign: 'center',
   },
 });
 
