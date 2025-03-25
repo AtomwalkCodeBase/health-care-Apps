@@ -5,6 +5,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context"; //
 import DropDown from './../components/old_components/DropDown';
+import { router } from "expo-router";
 
 const doctorList = [
   { id: "1", name: "Dr. Hamza Tariq", specialty: "Odontology", time: "10:30 AM - 3:30 PM", fee: "1000/-", rating: 4.5, image: { uri: "https://randomuser.me/api/portraits/men/1.jpg" } },
@@ -41,7 +42,11 @@ const AppointmentScreen = () => {
       `Your appointment with ${selectedDoctor.name} is booked.\n\nSpecialty: ${selectedDoctor.specialty}\nAvailable: ${selectedDoctor.time}\nFee: ${selectedDoctor.fee}`
     );
   };
-
+  const BookDateTime = () =>{
+    router.push({
+      pathname:"/DateTime"
+    });
+  }
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#2c3e50" barStyle="light-content" />
@@ -95,7 +100,7 @@ const AppointmentScreen = () => {
       {/* Book Button - Fixed at Bottom */}
       <View style={styles.bookButtonContainer}>
         <TouchableOpacity 
-          onPress={handleBooking} 
+          onPress={BookDateTime} 
           style={[
             styles.bookButton,
             !selectedDoctor && { backgroundColor: "#95a5a6" }
