@@ -195,7 +195,7 @@ const HomeScreen = () => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Image source={{ uri: profile?.image }} style={styles.profileImage} />
-          <Text style={styles.greeting}>
+          <Text style={styles.greeting}> 
             {STRINGS.greeting(profile?.emp_data?.name)}
           </Text>
         </View>
@@ -258,7 +258,7 @@ const HomeScreen = () => {
             keyExtractor={(item) => item.id.toString()}
             scrollEnabled={false}
             contentContainerStyle={styles.verticalList}
-             showsHorizontalScrollIndicator={false}
+            showsHorizontalScrollIndicator={false}
             showsVerticalScrollIndicator={false}
           />
         )}
