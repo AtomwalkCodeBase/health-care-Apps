@@ -1,6 +1,5 @@
 import { Stack } from "expo-router";
 import {AppProvider} from '../context/AppContext'
-import { Slot } from 'expo-router';
 import CustomStatusBar from '../src/components/StatusBar';
 
 export default function RootLayout() {
