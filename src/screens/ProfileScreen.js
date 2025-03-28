@@ -1,206 +1,356 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import styled from 'styled-components/native';
-import { View, Text } from 'react-native';
-import { MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { MaterialCommunityIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
 import { AppContext } from '../../context/AppContext';
 import { getProfileInfo } from '../services/authServices';
-import HeaderComponent from './HeaderComponent';
-import { useNavigation, useRouter } from 'expo-router';
-import Animated, { FadeIn, FadeOut, SlideInLeft, SlideOutRight } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Styled components
-const Container = styled.View`
-  flex: 1;
-  justify-content: flex-start;
-  align-items: center;
-  background-color: #f9f9fb;
-  padding: 20px;
-`;
-const DetailsContainer = styled.View`
-  /* flex: 1; */
-  justify-content: flex-start;
-  /* align-items: center; */
-  /* background-color: #f9f9fb; */
-  /* padding: 20px; */
-`;
-
-const AvatarContainer = styled(Animated.View)`
-  background-color: #e0bbff;
-  width: 120px;
-  height: 120px;
-  border-radius: 60px;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 20px;
-  shadow-color: #000;
-  shadow-opacity: 0.3;
-  shadow-radius: 10px;
-  elevation: 8;
-`;
-
-const ProfileImage = styled.Image`
-  width: 100px;
-  height: 100px;
-  border-radius: 50px;
-`;
-
-const UserName = styled(Animated.Text)`
-  font-size: 20px;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 5px;
-`;
-
-const InfoContainer = styled.View`
-  flex-direction: row;
-  align-items: center;
-  margin-bottom: 8px;
-`;
-
-const InfoIcon = styled(MaterialCommunityIcons)`
-  margin-right: 10px;
-`;
-
-const InfoText = styled(Animated.Text)`
-  font-size: 16px;
-  color: #555;
-`;
-
-const IsManagerContainer = styled(Animated.View)`
-  flex-direction: row;
-  align-items: center;
-  margin-bottom: 15px;
-`;
-
-const ManagerText = styled.Text`
-  font-size: 16px;
-  color: #333;
-  margin-right: 10px;
-`;
-
-const LogOutButton = styled.TouchableOpacity`
-  flex-direction: row;
-  align-items: center;
-  padding: 12px 20px;
-  border-radius: 25px;
-  background-color: #ffeded;
-  margin-top: 30px;
-  shadow-color: #000;
-  shadow-opacity: 0.2;
-  shadow-radius: 10px;
-  elevation: 5;
-`;
-
-const LogOutText = styled.Text`
-  color: #d9534f;
-  font-size: 16px;
-  margin-left: 10px;
-`;
-
-const ChangePasswordButton = styled.TouchableOpacity`
-  background-color: #4d88ff;
-  padding: 12px 25px;
-  border-radius: 25px;
-  margin-top: 20px;
-  shadow-color: #000;
-  shadow-opacity: 0.2;
-  shadow-radius: 10px;
-  elevation: 5;
-`;
-
-const ChangePasswordText = styled.Text`
-  color: #fff;
-  font-size: 16px;
-`;
+import Header from '../components/Header';
+import { useRouter } from 'expo-router';
+import Animated, { FadeIn, FadeOut, SlideInLeft } from 'react-native-reanimated';
 
 const ProfileScreen = () => {
-  const { logout } = useContext(AppContext);
-  const [profile, setProfile] = useState({});
-  const [isManager, setIsManager] = useState(false);
-  const [userPin, setUserPin] = useState(null);
+    const { logout } = useContext(AppContext);
+    const [profile, setProfile] = useState({});
+    const [isManager, setIsManager] = useState(false);
+    const [userPin, setUserPin] = useState(null);
+    const router = useRouter();
 
     useEffect(() => {
         const fetchUserPin = async () => {
             const storedPin = await AsyncStorage.getItem('userPin');
-            setUserPin(storedPin); // storedPin will be `null` if no value is found
+            setUserPin(storedPin);
         };
         fetchUserPin();
     }, []);
-  const router = useRouter();
-  const navigation = useNavigation();
 
-  useEffect(() => {
-    getProfileInfo().then((res) => {
-      setProfile(res.data);
-      setIsManager(res.data.user_group.is_manager);
-    });
-  }, []);
+    useEffect(() => {
+        getProfileInfo().then((res) => {
+            setProfile(res.data);
+            setIsManager(res.data?.user_group?.is_manager || false);
+        });
+    }, []);
 
-  const handleBackPress = () => {
-    navigation.goBack();
-  };
+    const handlePressPassword = () => {
+        router.push({ pathname: 'ResetPassword' });
+    };
 
-  const handlePressPassword = () => {
-    router.push({ pathname: 'ResetPassword' });
-  };
+    return (
+        <View style={styles.container}>
+            <Header title="Profile" showBackButton={true} />
+            
+            <ScrollView contentContainerStyle={styles.scrollContainer}>
+                {/* Profile Header */}
+                <Animated.View 
+                    style={styles.profileHeader}
+                    entering={FadeIn.duration(500)}
+                >
+                    <Animated.View 
+                        style={styles.avatarContainer}
+                        entering={FadeIn.duration(700)}
+                    >
+                        <Image 
+                            source={{ uri: profile?.image || 'https://via.placeholder.com/150' }} 
+                            style={styles.profileImage} 
+                        />
+                    </Animated.View>
+                    <Animated.Text 
+                        style={styles.userName}
+                        entering={FadeIn.duration(600)}
+                    >
+                        {profile?.emp_data?.name}
+                    </Animated.Text>
+                    
+                    {/* Manager Status */}
+                    <Animated.View 
+                        style={styles.managerContainer}
+                        entering={SlideInLeft.delay(300)}
+                    >
+                        <Text style={styles.managerText}>Is Manager:</Text>
+                        <MaterialCommunityIcons
+                            name={isManager ? "check-circle" : "cancel"}
+                            size={20}
+                            color={isManager ? "#2a7fba" : "#d9534f"}
+                        />
+                    </Animated.View>
+                    
+                    {/* Stats Row */}
+                    <View style={styles.statsContainer}>
+                        <Animated.View 
+                            style={styles.statItem}
+                            entering={SlideInLeft.delay(400)}
+                        >
+                            <Text style={styles.statValue}>{profile?.age || '--'}</Text>
+                            <Text style={styles.statLabel}>Age</Text>
+                        </Animated.View>
+                        <Animated.View 
+                            style={styles.statItem}
+                            entering={SlideInLeft.delay(450)}
+                        >
+                            <Text style={styles.statValue}>{profile?.gender || '--'}</Text>
+                            <Text style={styles.statLabel}>Gender</Text>
+                        </Animated.View>
+                        <Animated.View 
+                            style={styles.statItem}
+                            entering={SlideInLeft.delay(500)}
+                        >
+                            <Text style={styles.statValue}>{profile?.blood_group || '--'}</Text>
+                            <Text style={styles.statLabel}>Blood</Text>
+                        </Animated.View>
+                    </View>
+                </Animated.View>
 
-  return (
-    <>
-      <HeaderComponent headerTitle="My Profile" onBackPress={handleBackPress} />
-      <Container>
-        <AvatarContainer entering={FadeIn.duration(700)} exiting={FadeOut.duration(500)}>
-          <ProfileImage source={{ uri: profile?.image }} />
-        </AvatarContainer>
+                {/* Main Card */}
+                <Animated.View 
+                    style={styles.mainCard}
+                    entering={FadeIn.delay(300)}
+                >
+                    {/* Personal Information Section */}
+                    <View style={styles.cardSection}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialCommunityIcons name="account-circle" size={20} color="#2a7fba" />
+                            <Text style={styles.sectionTitle}>Personal Information</Text>
+                        </View>
+                        
+                        <Animated.View 
+                            style={styles.infoRow}
+                            entering={SlideInLeft.delay(400)}
+                        >
+                            <Text style={styles.infoLabel}>Employee ID</Text>
+                            <Text style={styles.infoValue}>{profile?.emp_data?.emp_id || 'Not specified'}</Text>
+                        </Animated.View>
+                        <Animated.View 
+                            style={styles.infoRow}
+                            entering={SlideInLeft.delay(450)}
+                        >
+                            <Text style={styles.infoLabel}>Department</Text>
+                            <Text style={styles.infoValue}>{profile?.emp_data?.department_name || 'Not specified'}</Text>
+                        </Animated.View>
+                        <Animated.View 
+                            style={styles.infoRow}
+                            entering={SlideInLeft.delay(500)}
+                        >
+                            <Text style={styles.infoLabel}>Address</Text>
+                            <Text style={styles.infoValue}>{profile?.address || 'Not specified'}</Text>
+                        </Animated.View>
+                        <Animated.View 
+                            style={styles.infoRow}
+                            entering={SlideInLeft.delay(550)}
+                        >
+                            <Text style={styles.infoLabel}>Phone</Text>
+                            <Text style={styles.infoValue}>{profile?.mobile_number || 'Not specified'}</Text>
+                        </Animated.View>
+                    </View>
 
-        <UserName entering={FadeIn.duration(500)}>{profile?.emp_data?.name}</UserName>
-        <UserName entering={FadeIn.duration(600)}>{profile?.user_name}</UserName>
+                    {/* Emergency Contact Section */}
+                    <View style={styles.cardSection}>
+                        <View style={styles.sectionHeader}>
+                            <MaterialCommunityIcons name="alert-circle" size={20} color="#d9534f" />
+                            <Text style={styles.sectionTitle}>Emergency Contact</Text>
+                        </View>
+                        
+                        <Animated.View 
+                            style={styles.infoRow}
+                            entering={SlideInLeft.delay(600)}
+                        >
+                            <Text style={styles.infoLabel}>Name</Text>
+                            <Text style={styles.infoValue}>{profile?.emergency_contact?.name || 'Not specified'}</Text>
+                        </Animated.View>
+                        <Animated.View 
+                            style={styles.infoRow}
+                            entering={SlideInLeft.delay(650)}
+                        >
+                            <Text style={styles.infoLabel}>Phone</Text>
+                            <Text style={styles.infoValue}>{profile?.emergency_contact?.phone || 'Not specified'}</Text>
+                        </Animated.View>
+                    </View>
 
-        <IsManagerContainer entering={SlideInLeft.delay(300).duration(400)}>
-          <ManagerText>Is Manager:</ManagerText>
-          <MaterialCommunityIcons
-            name={isManager ? "check-circle" : "cancel"}
-            size={24}
-            color={isManager ? "lightblue" : "red"}
-          />
-        </IsManagerContainer>
-
-        <DetailsContainer>
-        
-
-        {profile?.emp_data?.emp_id && (
-          <InfoContainer entering={SlideInLeft.delay(400)}>
-            <InfoIcon name="badge-account-horizontal" size={24} color="#555" />
-            <InfoText entering={FadeIn.duration(300)}>Employee ID: {profile.emp_data.emp_id}</InfoText>
-          </InfoContainer>
-        )}
-        {profile?.emp_data?.department_name && (
-          <InfoContainer entering={SlideInLeft.delay(500)}>
-            <InfoIcon name="office-building" size={24} color="#555" />
-            <InfoText entering={FadeIn.duration(400)}>Department: {profile.emp_data.department_name}</InfoText>
-          </InfoContainer>
-        )}
-        {profile?.mobile_number && (
-          <InfoContainer entering={SlideInLeft.delay(600)}>
-            <InfoIcon name="phone" size={24} color="#555" />
-            <InfoText entering={FadeIn.duration(500)}>Mobile: {profile.mobile_number}</InfoText>
-          </InfoContainer>
-        )}
-
-        </DetailsContainer>
-
-        <LogOutButton onPress={logout} entering={FadeIn.delay(700)}>
-          <MaterialCommunityIcons name="logout" size={24} color="#d9534f" />
-          <LogOutText>Log Out</LogOutText>
-        </LogOutButton>
-
-        <ChangePasswordButton onPress={handlePressPassword} entering={FadeIn.delay(800)}>
-          <ChangePasswordText>{userPin?"Update Your Pin":"Set Your Pin"}</ChangePasswordText>
-        </ChangePasswordButton>
-      </Container>
-    </>
-  );
+                    {/* Action Items */}
+                    <View style={styles.cardSection}>
+                        {/* Set/Update Pin moved to the top of action items */}
+                        <TouchableOpacity 
+                            style={styles.actionItem}
+                            onPress={handlePressPassword}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#e6f2ff' }]}>
+                                <MaterialCommunityIcons name="lock" size={20} color="#4d88ff" />
+                            </View>
+                            <Text style={[styles.actionText, { color: '#4d88ff' }]}>
+                                {userPin ? "Update Your Pin" : "Set Your Pin"}
+                            </Text>
+                            <MaterialCommunityIcons name="chevron-right" size={20} color="#999" />
+                        </TouchableOpacity>
+                        
+                        <View style={styles.divider} />
+                        
+                        <TouchableOpacity style={styles.actionItem}>
+                            <View style={styles.actionIcon}>
+                                <MaterialCommunityIcons name="cog" size={20} color="#555" />
+                            </View>
+                            <Text style={styles.actionText}>Settings</Text>
+                            <MaterialCommunityIcons name="chevron-right" size={20} color="#999" />
+                        </TouchableOpacity>
+                        
+                        <View style={styles.divider} />
+                        
+                        <TouchableOpacity 
+                            style={styles.actionItem} 
+                            onPress={logout}
+                        >
+                            <View style={[styles.actionIcon, { backgroundColor: '#ffebee' }]}>
+                                <MaterialCommunityIcons name="logout" size={20} color="#d9534f" />
+                            </View>
+                            <Text style={[styles.actionText, { color: '#d9534f' }]}>Log Out</Text>
+                            <MaterialCommunityIcons name="chevron-right" size={20} color="#999" />
+                        </TouchableOpacity>
+                    </View>
+                </Animated.View>
+            </ScrollView>
+        </View>
+    );
 };
+
+const styles = StyleSheet.create({
+  container: {
+      flex: 1,
+      backgroundColor: '#f5f7fa',
+  },
+  scrollContainer: {
+      paddingBottom: 30,
+  },
+  profileHeader: {
+      alignItems: 'center',
+      paddingVertical: 25,
+      backgroundColor: '#fff',
+      marginBottom: 15,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+      elevation: 3,
+  },
+  avatarContainer: {
+      backgroundColor: '#e0f7fa',
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 15,
+      borderWidth: 3,
+      borderColor: '#2a7fba',
+  },
+  profileImage: {
+      width: 110,
+      height: 110,
+      borderRadius: 55,
+  },
+  userName: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: '#333',
+      marginBottom: 10,
+  },
+  managerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 15,
+  },
+  managerText: {
+      fontSize: 16,
+      color: '#333',
+      marginRight: 10,
+  },
+  statsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      width: '80%',
+  },
+  statItem: {
+      alignItems: 'center',
+      padding: 10,
+      backgroundColor: '#f0f8ff',
+      borderRadius: 10,
+      width: '30%',
+  },
+  statValue: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: '#2a7fba',
+  },
+  statLabel: {
+      fontSize: 14,
+      color: '#666',
+      marginTop: 5,
+  },
+  mainCard: {
+      backgroundColor: '#fff',
+      borderRadius: 15,
+      marginHorizontal: 15,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+      elevation: 3,
+      overflow: 'hidden',
+  },
+  cardSection: {
+      paddingHorizontal: 20,
+      paddingVertical: 15,
+  },
+  sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 15,
+  },
+  sectionTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: '#333',
+      marginLeft: 10,
+  },
+  infoRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f0f0f0',
+  },
+  infoLabel: {
+      fontSize: 16,
+      color: '#666',
+  },
+  infoValue: {
+      fontSize: 16,
+      color: '#333',
+      fontWeight: '500',
+      textAlign: 'right',
+      flex: 1,
+      paddingLeft: 10,
+  },
+  actionItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+  },
+  actionIcon: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: '#f0f0f0',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 15,
+  },
+  actionText: {
+      fontSize: 16,
+      color: '#333',
+      flex: 1,
+  },
+  divider: {
+      height: 1,
+      backgroundColor: '#f0f0f0',
+      marginVertical: 5,
+  },
+});
 
 export default ProfileScreen;
