@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
 import CustomModal from '../components/CustomModal';
 
-// Initial appointment data structure
-const initialAppointmentsData = {
+// Initial appointment data structure (exported for external use)
+export const initialAppointmentsData = {
   upcoming: [
     {
       id: '1',
@@ -38,10 +38,11 @@ const initialAppointmentsData = {
   cancelled: []
 };
 
+// AppointmentCard component
 const AppointmentCard = ({ appointment, onComplete, onUpdate, onDelete, isCancelled, isPast }) => {
   return (
     <View style={[
-      styles.card, 
+      styles.card,
       isCancelled && styles.cancelledCard,
       isPast && styles.pastCard
     ]}>
@@ -78,6 +79,7 @@ const AppointmentCard = ({ appointment, onComplete, onUpdate, onDelete, isCancel
   );
 };
 
+// TabButton component
 const TabButton = ({ active, label, onPress }) => (
   <TouchableOpacity
     style={[styles.tabButton, active && styles.activeTabButton]}
@@ -89,51 +91,14 @@ const TabButton = ({ active, label, onPress }) => (
   </TouchableOpacity>
 );
 
-export default function MyAppointments() {
-  const [activeTab, setActiveTab] = useState('upcoming');
+// Custom hook to manage appointments state (exported for reusability)
+export const useAppointments = () => {
   const [appointments, setAppointments] = useState(initialAppointmentsData);
-  const [isModalVisible, setModalVisible] = useState(false);
-  const [data, setData] = useState('');
-  const[cancelclick, setCancelclick]=useState(false);
-  const movetocancel=()=>{
-    moveToCancelled(data)
-    setModalVisible(false);
-  }
-
-  const onpressyes=()=>{
-    moveToPast(data)
-    setModalVisible(false);
-  }
-  const onpresno=()=>{
-    setModalVisible(false);
-  }
-
-  const handleComplete = (appointmentId) => {
-    setModalVisible(true);
-    setData(appointmentId)
-    
-    // Alert.alert(
-    //   'Confirm Completion',
-    //   'Mark this appointment as completed?',
-    //   [
-    //     {
-    //       text: 'No',
-    //       style: 'cancel',
-    //     },
-    //     {
-    //       text: 'Yes',
-    //       onPress: () => moveToPast(appointmentId),
-    //     },
-    //   ]
-    // );
-  };
 
   const moveToPast = (appointmentId) => {
     setAppointments(prev => {
       const appointmentToComplete = prev.upcoming.find(a => a.id === appointmentId);
-      
       if (!appointmentToComplete) return prev;
-      
       return {
         ...prev,
         upcoming: prev.upcoming.filter(a => a.id !== appointmentId),
@@ -143,41 +108,12 @@ export default function MyAppointments() {
         }]
       };
     });
-    
-    setActiveTab('past');
-  };
-
-  const handleUpdate = (appointmentId) => {
-    router.push(`/appointments/${appointmentId}/update`);
-  };
-
-  const handleCancel = (appointmentId) => {
-    setModalVisible(true);
-    setCancelclick(true);
-    setData(appointmentId)
-    // Alert.alert(
-    //   'Confirm Cancellation',
-    //   'Are you sure you want to cancel this appointment?',
-    //   [
-    //     {
-    //       text: 'No',
-    //       style: 'cancel',
-    //     },
-    //     {
-    //       text: 'Yes',
-    //       onPress: () => moveToCancelled(appointmentId),
-    //       style: 'destructive',
-    //     },
-    //   ]
-    // );
   };
 
   const moveToCancelled = (appointmentId) => {
     setAppointments(prev => {
       const appointmentToCancel = prev.upcoming.find(a => a.id === appointmentId);
-      
       if (!appointmentToCancel) return prev;
-      
       return {
         ...prev,
         upcoming: prev.upcoming.filter(a => a.id !== appointmentId),
@@ -187,8 +123,48 @@ export default function MyAppointments() {
         }]
       };
     });
-    
+  };
+
+  return { appointments, setAppointments, moveToPast, moveToCancelled };
+};
+
+// Main MyAppointments component
+export default function MyAppointments() {
+  const [activeTab, setActiveTab] = useState('upcoming');
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [data, setData] = useState('');
+  const [cancelclick, setCancelclick] = useState(false);
+  const { appointments, moveToPast, moveToCancelled } = useAppointments();
+
+  const movetocancel = () => {
+    moveToCancelled(data);
+    setModalVisible(false);
     setActiveTab('cancelled');
+  };
+
+  const onpressyes = () => {
+    moveToPast(data);
+    setModalVisible(false);
+    setActiveTab('past');
+  };
+
+  const onpresno = () => {
+    setModalVisible(false);
+  };
+
+  const handleComplete = (appointmentId) => {
+    setModalVisible(true);
+    setData(appointmentId);
+  };
+
+  const handleUpdate = (appointmentId) => {
+    router.push(`/appointments/${appointmentId}/update`);
+  };
+
+  const handleCancel = (appointmentId) => {
+    setModalVisible(true);
+    setCancelclick(true);
+    setData(appointmentId);
   };
 
   return (
@@ -239,11 +215,18 @@ export default function MyAppointments() {
           </View>
         )}
       </ScrollView>
-      <CustomModal  isModalVisible={isModalVisible} onpressyes={onpressyes} onpresno={onpresno} cancelclick={cancelclick}movetocancel={movetocancel}></CustomModal>
+      <CustomModal
+        isModalVisible={isModalVisible}
+        onpressyes={onpressyes}
+        onpresno={onpresno}
+        cancelclick={cancelclick}
+        movetocancel={movetocancel}
+      />
     </View>
   );
 }
 
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,

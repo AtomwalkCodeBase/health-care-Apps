@@ -1,4 +1,4 @@
-import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList } from "../services/ConstantServies";
+import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList, getemployeeList } from "../services/ConstantServies";
 import { authAxios, authAxiosFilePost, authAxiosPost } from "./HttpMethod";
 
 export function getEmpLeave(leave_type , emp_id, year) {
@@ -46,9 +46,9 @@ export function getEmpLeave(leave_type , emp_id, year) {
   
   }
 
-  export function getClaimApprover() { 
+  export function getemployelistview() { 
     let data = {};
-    return authAxios(getClaimApproverList)
+    return authAxios(getemployeeList)
   }
 
   export function getEmpClaim(res) {

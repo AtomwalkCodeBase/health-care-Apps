@@ -13,6 +13,8 @@ import { router } from "expo-router";
 import React, { useState, useEffect, useMemo } from "react";
 import { getProfileInfo } from "../services/authServices";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import { getemployelistview } from "../services/productServices";
+import { initialAppointmentsData } from "./MyAppointments";
 
 // Constants
 const COLORS = {
@@ -54,74 +56,23 @@ const serviceList = [
   { name: "Oncology", icon: "ribbon" },
 ];
 
-// Doctors list with unique IDs
-const doctorList = [
-  {
-    id: 1,
-    name: "Dr. Hamza Tariq",
-    specialty: "Odontology",
-    time: "10:30 AM - 3:30 PM",
-    fee: "1000/-",
-    rating: 4.5,
-    image: { uri: "https://randomuser.me/api/portraits/men/1.jpg" },
-  },
-  {
-    id: 2,
-    name: "Dr. Alina Fatima",
-    specialty: "Senior Surgeon",
-    time: "10:30 AM - 3:30 PM",
-    fee: "1500/-",
-    rating: 5.0,
-    image: { uri: "https://randomuser.me/api/portraits/women/2.jpg" },
-  },
-  {
-    id: 3,
-    name: "Dr. John Doe",
-    specialty: "Cardiologist",
-    time: "9:00 AM - 1:00 PM",
-    fee: "500/-",
-    rating: 4.8,
-    image: { uri: "https://randomuser.me/api/portraits/men/4.jpg" },
-  },
-  {
-    id: 4,
-    name: "Dr. Sarah Smith",
-    specialty: "Pediatrician",
-    time: "8:00 AM - 12:00 PM",
-    fee: "1200/-",
-    rating: 4.9,
-    image: { uri: "https://randomuser.me/api/portraits/women/3.jpg" },
-  },
-  {
-    id: 5,
-    name: "Dr. Sarah Smith",
-    specialty: "Pediatrician",
-    time: "8:00 AM - 12:00 PM",
-    fee: "1200/-",
-    rating: 4.9,
-    image: { uri: "https://randomuser.me/api/portraits/women/3.jpg" },
-  },
-  {
-    id: 6,
-    name: "Dr. Sarah Smith",
-    specialty: "Pediatrician",
-    time: "8:00 AM - 12:00 PM",
-    fee: "1200/-",
-    rating: 4.9,
-    image: { uri: "https://randomuser.me/api/portraits/women/3.jpg" },
-  },
-];
+
 
 const HomeScreen = () => {
   const [profile, setProfile] = useState({});
   const [searchText, setSearchText] = useState("");
   const [isAscending, setIsAscending] = useState(true);
-
+  const[doctorList, setDoctorList]=useState([]);
+  const appointments = initialAppointmentsData;
+  console.log(doctorList,"yyy")
   useEffect(() => {
+    getemployelistview().then((res) => setDoctorList(res.data))
+    .catch((error) => console.error("employee load failed:", error));
     getProfileInfo()
       .then((res) => setProfile(res.data))
       .catch((error) => console.error("Profile load failed:", error));
   }, []);
+  
 
   const { filteredServices, filteredDoctors } = useMemo(() => {
     const lowerText = searchText.toLowerCase();
@@ -130,23 +81,24 @@ const HomeScreen = () => {
       service.name.toLowerCase().includes(lowerText)
     );
 
-    const matchedDoctors = doctorList
-      .filter(
-        (doc) =>
-          doc.name.toLowerCase().includes(lowerText) ||
-          doc.specialty.toLowerCase().includes(lowerText)
-      )
-      .sort((a, b) =>
-        isAscending
-          ? a.name.localeCompare(b.name)
-          : b.name.localeCompare(a.name)
-      );
+    const matchedDoctors = (doctorList || [])
+  .filter(
+    (doc) =>
+      doc.name?.toLowerCase()?.includes(lowerText) ||  // Use optional chaining (?.)
+      doc.specialty?.toLowerCase()?.includes(lowerText) // Use optional chaining (?.)
+  )
+  .sort((a, b) =>
+    isAscending
+      ? (a.name || "").localeCompare(b.name || "") // Handle undefined names
+      : (b.name || "").localeCompare(a.name || "")
+  );
 
+      
     return {
       filteredServices: matchedServices,
       filteredDoctors: matchedDoctors,
     };
-  }, [searchText, isAscending]);
+  }, [searchText, isAscending, doctorList]); 
 
   const toggleSortOrder = () => setIsAscending(!isAscending);
 
@@ -161,6 +113,19 @@ const HomeScreen = () => {
 
   const handleBookNow = () => router.push("/BookingAppointment");
 
+  const AppointmentCard = ({ item }) => (
+    <TouchableOpacity style={styles.appointmentCard}>
+      <Image source={item.image} style={styles.appointmentImage} />
+      <View style={styles.appointmentInfo}>
+        <Text style={styles.appointmentDoctorName}>{item.doctorName}</Text>
+        <Text style={styles.appointmentDesignation}>{item.designation}</Text>
+        <Text style={styles.appointmentDateTime}>
+          {item.date} at {item.time}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   const ServiceCard = ({ item }) => (
     <TouchableOpacity style={styles.serviceCard}>
       <MaterialCommunityIcons
@@ -172,21 +137,21 @@ const HomeScreen = () => {
       <Text style={styles.serviceText}>{item.name}</Text>
     </TouchableOpacity>
   );
-
+  
   const DoctorCard = ({ item }) => (
     <TouchableOpacity
       style={styles.doctorCard}
       onPress={() => handleDoctorPress(item.name)}
     >
-      <Image source={item.image} style={styles.doctorImage} />
+      <Image source={{ uri:item?.image }} style={styles.doctorImage} />  
       <View style={styles.doctorInfo}>
         <Text style={styles.doctorName}>{item.name}</Text>
-        <Text style={styles.doctorSpecialty}>{item.specialty}</Text>
+        <Text style={styles.doctorSpecialty}>{item.department_name} - {item.grade_name}</Text> 
         <Text style={styles.doctorDetails}>
-          ⏰ {item.time} | Fee: {item.fee}
+          ⏰ 10:30 AM - 3:30 PM | Fee: 400
         </Text>
       </View>
-      <Text style={styles.rating}>⭐ {item.rating}</Text>
+      <Text style={styles.rating}>⭐ 4.5</Text>
     </TouchableOpacity>
   );
 
@@ -232,6 +197,21 @@ const HomeScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Upcoming Appointments Section */}
+      {appointments.upcoming.length > 0 && (
+        <View style={styles.appointmentsContainer}>
+          <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
+          <FlatList
+            horizontal
+            data={appointments.upcoming}
+            renderItem={({ item }) => <AppointmentCard item={item} />}
+            keyExtractor={(item) => item.id}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.appointmentsList}
+          />
+        </View>
+      )}
+
       {/* Services Section */}
       <ScrollView 
       showsVerticalScrollIndicator={false} 
@@ -249,7 +229,7 @@ const HomeScreen = () => {
 
         {/* Doctors Section */}
         <Text style={styles.sectionTitle}>{STRINGS.doctorsTitle}</Text>
-        {filteredDoctors.length === 0 ? (
+        {filteredDoctors.length == 0 ? (
           <Text style={styles.noResultsText}>{STRINGS.noDoctors}</Text>
         ) : (
           <FlatList
@@ -411,6 +391,45 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     textAlign: "center",
     marginVertical: 20,
+  },
+  appointmentsContainer: {
+    marginBottom: 20,
+  },
+  appointmentsList: {
+    paddingBottom: 10,
+  },
+  appointmentCard: {
+    width: Dimensions.get("window").width * 0.7,
+    flexDirection: "row",
+    backgroundColor: "#f9f9f9",
+    borderRadius: 10,
+    padding: 12,
+    marginRight: 12,
+    alignItems: "center",
+  },
+  appointmentImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+  },
+  appointmentInfo: {
+    flex: 1,
+  },
+  appointmentDoctorName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  appointmentDesignation: {
+    fontSize: 14,
+    color: COLORS.secondaryText,
+    marginBottom: 2,
+  },
+  appointmentDateTime: {
+    fontSize: 13,
+    color: COLORS.secondaryText,
   },
 });
 
