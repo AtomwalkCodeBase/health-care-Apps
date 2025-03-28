@@ -115,15 +115,8 @@ const ProfileScreen = () => {
                             style={styles.infoRow}
                             entering={SlideInLeft.delay(400)}
                         >
-                            <Text style={styles.infoLabel}>Employee ID</Text>
+                            <Text style={styles.infoLabel}>User ID</Text>
                             <Text style={styles.infoValue}>{profile?.emp_data?.emp_id || 'Not specified'}</Text>
-                        </Animated.View>
-                        <Animated.View 
-                            style={styles.infoRow}
-                            entering={SlideInLeft.delay(450)}
-                        >
-                            <Text style={styles.infoLabel}>Department</Text>
-                            <Text style={styles.infoValue}>{profile?.emp_data?.department_name || 'Not specified'}</Text>
                         </Animated.View>
                         <Animated.View 
                             style={styles.infoRow}
@@ -144,7 +137,7 @@ const ProfileScreen = () => {
                     {/* Emergency Contact Section */}
                     <View style={styles.cardSection}>
                         <View style={styles.sectionHeader}>
-                            <MaterialCommunityIcons name="alert-circle" size={20} color="#d9534f" />
+                            <MaterialCommunityIcons name="alert-circle" size={20} color="#ffc433" />
                             <Text style={styles.sectionTitle}>Emergency Contact</Text>
                         </View>
                         
@@ -161,6 +154,13 @@ const ProfileScreen = () => {
                         >
                             <Text style={styles.infoLabel}>Phone</Text>
                             <Text style={styles.infoValue}>{profile?.emergency_contact?.phone || 'Not specified'}</Text>
+                        </Animated.View>
+                        <Animated.View 
+                            style={styles.infoRow}
+                            entering={SlideInLeft.delay(650)}
+                        >
+                            <Text style={styles.infoLabel}>Relationship</Text>
+                            <Text style={styles.infoValue}>{profile?.emergency_contact?.relationship || 'Not specified'}</Text>
                         </Animated.View>
                     </View>
 
