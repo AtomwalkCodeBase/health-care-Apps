@@ -6,196 +6,204 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Alert,
 } from "react-native";
-import { Ionicons, FontAwesome, MaterialIcons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import Header from "../../src/components/Header";
+import { router, useLocalSearchParams } from "expo-router";
 
 const DoctorProfile = () => {
-  const navigation = useNavigation();
-  const [expanded, setExpanded] = useState(false);
-  const [liked, setLiked] = useState(false);
-  const item=useLocalSearchParams();
+  const item = useLocalSearchParams();
 
-  const handleBook = () => {
-    Alert.alert("Appointment Booked", "Your appointment has been confirmed.");
+  const handleBack = () => {
+    router.back()
   };
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <ScrollView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={24} color="black" />
-          </TouchableOpacity>
-          <Text style={styles.headerText}>Doctor</Text>
-          <TouchableOpacity onPress={() => setLiked(!liked)}>
-            <Ionicons
-              name={liked ? "heart" : "heart-outline"}
-              size={24}
-              color={liked ? "red" : "black"}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Profile Image */}
+    <ScrollView style={styles.headercontainer}>
+      {/* Header */}
+      <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
+      <Header title="Doctor Profile" />
+    <View style={styles.profileCard}>
+      {/* Profile Card */}
+      <View>
         <Image
-          source={{ uri: "https://randomuser.me/api/portraits/men/1.jpg" }}
+          source={{ uri: item.Image }}
           style={styles.profileImage}
         />
+        <Text style={styles.name}>{item.name}</Text>
+        <Text style={styles.speciality}>Cardiologist</Text>
+      </View>
 
-        {/* Name and Rating */}
-        <View style={styles.nameRatingSection}>
-          <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.speciality}>Cardiologist and Surgeon</Text>
-          <View style={styles.ratingContainer}>
-            <FontAwesome name="star" size={16} color="#FDC500" />
-            <Text style={styles.ratingText}>4.9 (96 reviews)</Text>
-          </View>
+      {/* Experience, Rating, and Patients Cards */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>12 years</Text>
+          <Text style={styles.statLabel}>Experience</Text>
         </View>
-
-        {/* Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Ionicons name="person" size={24} color="#3C6FF8" />
-            <Text style={styles.statText}>116+</Text>
-            <Text style={styles.statLabel}>Patients</Text>
-          </View>
-          <View style={styles.statBox}>
-            <MaterialIcons name="verified" size={24} color="#3C6FF8" />
-            <Text style={styles.statText}>3+</Text>
-            <Text style={styles.statLabel}>Years</Text>
-          </View>
-          <View style={styles.statBox}>
-            <FontAwesome name="star" size={24} color="#3C6FF8" />
-            <Text style={styles.statText}>4.9</Text>
-            <Text style={styles.statLabel}>Rating</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Ionicons name="chatbubble-ellipses" size={24} color="#3C6FF8" />
-            <Text style={styles.statText}>90+</Text>
-            <Text style={styles.statLabel}>Reviews</Text>
-          </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>4.8</Text>
+          <Text style={styles.statLabel}>Rating</Text>
         </View>
-
-        {/* About Me */}
-        <View style={styles.aboutContainer}>
-          <Text style={styles.aboutHeader}>About Me</Text>
-          <Text style={styles.aboutText}>
-            {expanded
-              ? "Dr. Ali Uzair is a top cardiologist and surgeon at Crist Hospital in London, UK. He has received several awards for his outstanding contributions to the field of cardiovascular medicine. With over 116 patients treated and 90+ reviews, he’s widely respected for his compassionate care and advanced surgical techniques. "
-              : "Dr. Ali Uzair is a top cardiologist and surgeon at Crist Hospital in London, UK. He has received several awards for his outstanding contributions "}
-            <Text
-              style={styles.readMore}
-              onPress={() => setExpanded(!expanded)}
-            >
-              {expanded ? " Show Less" : " Read More..."}
-            </Text>
-          </Text>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>2500+</Text>
+          <Text style={styles.statLabel}>Patients</Text>
         </View>
+      </View>
 
-        {/* Book Button */}
-        <TouchableOpacity style={styles.bookButton} onPress={handleBook}>
-          <Text style={styles.bookButtonText}>Book Appointment</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+      {/* About Section */}
+      <View style={styles.aboutContainer}>
+        <Text style={styles.sectionTitle}>About</Text>
+        <Text style={styles.aboutText}>
+          Dr. Thomas Michael is a highly experienced cardiologist with 15+ years
+          of expertise in diagnosing and treating heart-related conditions. He
+          specializes in managing hypertension, heart disease, and related problems.
+        </Text>
+      </View>
+
+      {/* Fees & Session Cards */}
+      <View style={styles.feesContainer}>
+        <View style={styles.feeCard}>
+          <Text style={styles.feeValue}>₹300</Text>
+          <Text style={styles.feeLabel}>Consultation Fee</Text>
+        </View>
+        <View style={styles.feeCard}>
+          <Text style={styles.feeValue}>30 mins</Text>
+          <Text style={styles.feeLabel}>Avg. Session</Text>
+        </View>
+        <View style={styles.feeCard}>
+          <Text style={styles.feeValue}>1500+</Text>
+          <Text style={styles.feeLabel}>Attended Patients</Text>
+        </View>
+      </View>
+      </View>
+
+      {/* Continue Button */}
+      <TouchableOpacity onPress={handleBack} style={styles.continueButton}>
+        <Text style={styles.continueButtonText}>Continue</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
+  headercontainer: {
+    flex: 1,
+    backgroundColor: "#F8F9FA",
+    // padding: 18,
+    marginTop: 45,
+  },
   container: {
     flex: 1,
-    backgroundColor: "#fff",
-    paddingHorizontal: 16,
+    backgroundColor: "#F8F9FA",
+    padding: 16,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  profileCard: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 20,
     alignItems: "center",
-    marginTop: 50,
-    marginBottom: 10,
-  },
-  headerText: {
-    fontSize: 18,
-    fontWeight: "bold",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   profileImage: {
-    width: "80%",
-    height: 300,
-    alignSelf: "center",
-    borderRadius: 16,
-    resizeMode: "cover",
-  },
-  nameRatingSection: {
-    marginTop: 12,
-    alignItems: "flex-start",
-    paddingHorizontal: 4,
+    width: 110,
+    height: 110,
+    borderRadius: 75,
   },
   name: {
     fontSize: 20,
     fontWeight: "bold",
+    marginTop: 8,
   },
   speciality: {
     color: "gray",
-    marginTop: 2,
-  },
-  ratingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 4,
-  },
-  ratingText: {
-    marginLeft: 4,
-    color: "gray",
+    textAlign: "center",
   },
   statsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 24,
+    marginTop: 16,
   },
-  statBox: {
+  statCard: {
+    flex: 1,
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 16,
     alignItems: "center",
-    width: "22%",
+    marginHorizontal: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  statText: {
+  statValue: {
+    fontSize: 16,
     fontWeight: "bold",
-    marginTop: 4,
+    color: "#2c3e50",
   },
   statLabel: {
-    color: "gray",
     fontSize: 12,
-    textAlign: "center",
+    color: "#666",
+    marginTop: 4,
   },
   aboutContainer: {
-    marginTop: 24,
-    paddingHorizontal: 4,
+    backgroundColor: "white",
+    padding: 16,
+    borderRadius: 10,
+    marginTop: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  aboutHeader: {
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: "bold",
-    fontSize: 16,
+    marginBottom: 8,
+    color: "#2c3e50",
   },
   aboutText: {
-    marginTop: 8,
     color: "gray",
-    lineHeight: 20,
+    fontSize: 14,
   },
-  readMore: {
-    color: "#3C6FF8",
-    fontWeight: "500",
+  feesContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
   },
-  bookButton: {
-    backgroundColor: "#3C6FF8",
+  feeCard: {
+    flex: 1,
+    backgroundColor: "white",
+    borderRadius: 12,
     padding: 16,
+    alignItems: "center",
+    marginHorizontal: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  feeValue: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#2c3e50",
+  },
+  feeLabel: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
+  },
+  continueButton: {
+    backgroundColor: "#2a7fba",
+    padding: 18,
     borderRadius: 30,
     alignItems: "center",
     marginTop: 24,
     marginBottom: 40,
   },
-  bookButtonText: {
+  continueButtonText: {
     color: "#fff",
     fontWeight: "bold",
     fontSize: 16,

@@ -14,7 +14,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { getProfileInfo } from "../services/authServices";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { getemployelistview } from "../services/productServices";
-import { initialAppointmentsData } from "./MyAppointments";
+import { getAppointments, subscribeToAppointments } from "./MyAppointments";
 
 // Constants
 const COLORS = {
@@ -62,18 +62,28 @@ const HomeScreen = () => {
   const [profile, setProfile] = useState({});
   const [searchText, setSearchText] = useState("");
   const [isAscending, setIsAscending] = useState(true);
-  const[doctorList, setDoctorList]=useState([]);
-  const appointments = initialAppointmentsData;
-  console.log(doctorList,"yyy")
+  const [doctorList, setDoctorList] = useState([]);
+  const [appointments, setAppointments] = useState(getAppointments());
+
   useEffect(() => {
-    getemployelistview().then((res) => setDoctorList(res.data))
-    .catch((error) => console.error("employee load failed:", error));
+    // Load initial data
+    getemployelistview()
+      .then((res) => setDoctorList(res.data))
+      .catch((error) => console.error("employee load failed:", error));
     getProfileInfo()
       .then((res) => setProfile(res.data))
       .catch((error) => console.error("Profile load failed:", error));
-  }, []);
-  
 
+    // Subscribe to appointment updates
+    const unsubscribe = subscribeToAppointments((updatedAppointments) => {
+      setAppointments(updatedAppointments);
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, []);
+
+  
   const { filteredServices, filteredDoctors } = useMemo(() => {
     const lowerText = searchText.toLowerCase();
 
@@ -82,32 +92,30 @@ const HomeScreen = () => {
     );
 
     const matchedDoctors = (doctorList || [])
-  .filter(
-    (doc) =>
-      doc.name?.toLowerCase()?.includes(lowerText) ||  // Use optional chaining (?.)
-      doc.specialty?.toLowerCase()?.includes(lowerText) // Use optional chaining (?.)
-  )
-  .sort((a, b) =>
-    isAscending
-      ? (a.name || "").localeCompare(b.name || "") // Handle undefined names
-      : (b.name || "").localeCompare(a.name || "")
-  );
+      .filter(
+        (doc) =>
+          doc.name?.toLowerCase()?.includes(lowerText) ||
+          doc.specialty?.toLowerCase()?.includes(lowerText)
+      )
+      .sort((a, b) =>
+        isAscending
+          ? (a.name || "").localeCompare(b.name || "")
+          : (b.name || "").localeCompare(a.name || "")
+      );
 
       
     return {
       filteredServices: matchedServices,
       filteredDoctors: matchedDoctors,
     };
-  }, [searchText, isAscending, doctorList]); 
+  }, [searchText, isAscending, doctorList]);
 
   const toggleSortOrder = () => setIsAscending(!isAscending);
 
   const handleDoctorPress = (name) => {
     router.push({
       pathname: "/DoctorDetails",
-      params: {
-        name: name,
-      },
+      params: { name: name },
     });
   };
 
@@ -137,16 +145,18 @@ const HomeScreen = () => {
       <Text style={styles.serviceText}>{item.name}</Text>
     </TouchableOpacity>
   );
-  
+
   const DoctorCard = ({ item }) => (
     <TouchableOpacity
       style={styles.doctorCard}
       onPress={() => handleDoctorPress(item.name)}
     >
-      <Image source={{ uri:item?.image }} style={styles.doctorImage} />  
+      <Image source={{ uri: item?.image }} style={styles.doctorImage} />
       <View style={styles.doctorInfo}>
         <Text style={styles.doctorName}>{item.name}</Text>
-        <Text style={styles.doctorSpecialty}>{item.department_name} - {item.grade_name}</Text> 
+        <Text style={styles.doctorSpecialty}>
+          {item.department_name} - {item.grade_name}
+        </Text>
         <Text style={styles.doctorDetails}>
           ⏰ 10:30 AM - 3:30 PM | Fee: 400
         </Text>
@@ -160,21 +170,18 @@ const HomeScreen = () => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Image source={{ uri: profile?.image }} style={styles.profileImage} />
-          <Text style={styles.greeting}> 
+          <Text style={styles.greeting}>
             {STRINGS.greeting(profile?.emp_data?.name)}
           </Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity
-            onPress={handleBookNow}
-            style={styles.bookNowButton}
-          >
+          <TouchableOpacity onPress={handleBookNow} style={styles.bookNowButton}>
             <MaterialCommunityIcons name="plus" size={18} color="#fff" />
             <Text style={styles.bookNowText}>{STRINGS.bookNow}</Text>
           </TouchableOpacity>
         </View>
       </View>
-      {/* Search Section */}
+  
       <View style={styles.searchContainer}>
         <MaterialCommunityIcons name="magnify" size={22} color="gray" />
         <TextInput
@@ -186,20 +193,15 @@ const HomeScreen = () => {
         />
         <TouchableOpacity onPress={toggleSortOrder} style={styles.filterButton}>
           <MaterialCommunityIcons
-            name={
-              isAscending
-                ? "sort-alphabetical-ascending"
-                : "sort-alphabetical-descending"
-            }
+            name={isAscending ? "sort-alphabetical-ascending" : "sort-alphabetical-descending"}
             size={22}
             color="gray"
           />
         </TouchableOpacity>
       </View>
-
-      {/* Upcoming Appointments Section */}
+  
       {appointments.upcoming.length > 0 && (
-        <View style={styles.appointmentsContainer}>
+        <View style={styles.filterixedAppointmentsContainer}>
           <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
           <FlatList
             horizontal
@@ -211,11 +213,8 @@ const HomeScreen = () => {
           />
         </View>
       )}
-
-      {/* Services Section */}
-      <ScrollView 
-      showsVerticalScrollIndicator={false} 
-      showsHorizontalScrollIndicator={false}>
+  
+      <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionTitle}>{STRINGS.servicesTitle}</Text>
         <FlatList
           horizontal
@@ -223,13 +222,11 @@ const HomeScreen = () => {
           renderItem={({ item }) => <ServiceCard item={item} />}
           keyExtractor={(item) => item.name}
           showsHorizontalScrollIndicator={false}
-          showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.servicesContainer}
         />
-
-        {/* Doctors Section */}
+  
         <Text style={styles.sectionTitle}>{STRINGS.doctorsTitle}</Text>
-        {filteredDoctors.length == 0 ? (
+        {filteredDoctors.length === 0 ? (
           <Text style={styles.noResultsText}>{STRINGS.noDoctors}</Text>
         ) : (
           <FlatList
@@ -238,8 +235,6 @@ const HomeScreen = () => {
             keyExtractor={(item) => item.id.toString()}
             scrollEnabled={false}
             contentContainerStyle={styles.verticalList}
-            showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
           />
         )}
       </ScrollView>
@@ -247,7 +242,7 @@ const HomeScreen = () => {
   );
 };
 
-// Styles
+// Styles (unchanged)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -270,8 +265,8 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    borderWidth:2,
-    borderColor:"#F1E7E7",
+    borderWidth: 2,
+    borderColor: "#F1E7E7",
   },
   greeting: {
     fontSize: 20,
@@ -311,14 +306,6 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 16,
     color: COLORS.text,
-  },
-  sortButton: {
-    marginLeft: 10,
-    padding: 5,
-  },
-  sortText: {
-    color: COLORS.primary,
-    fontWeight: "500",
   },
   sectionTitle: {
     fontSize: 18,

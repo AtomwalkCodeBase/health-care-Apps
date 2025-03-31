@@ -5,8 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
 import CustomModal from '../components/CustomModal';
 
-// Initial appointment data structure (exported for external use)
-export const initialAppointmentsData = {
+// Initial appointment data structure
+const initialAppointmentsData = {
   upcoming: [
     {
       id: '1',
@@ -36,6 +36,21 @@ export const initialAppointmentsData = {
     }
   ],
   cancelled: []
+};
+
+// Appointment state management
+let appointmentsState = { ...initialAppointmentsData };
+const listeners = new Set();
+
+export const getAppointments = () => appointmentsState;
+
+export const subscribeToAppointments = (callback) => {
+  listeners.add(callback);
+  return () => listeners.delete(callback);
+};
+
+const notifyListeners = () => {
+  listeners.forEach(callback => callback(appointmentsState));
 };
 
 // AppointmentCard component
@@ -91,38 +106,40 @@ const TabButton = ({ active, label, onPress }) => (
   </TouchableOpacity>
 );
 
-// Custom hook to manage appointments state (exported for reusability)
+// Custom hook to manage appointments state
 export const useAppointments = () => {
-  const [appointments, setAppointments] = useState(initialAppointmentsData);
+  const [appointments, setAppointments] = useState(appointmentsState);
 
   const moveToPast = (appointmentId) => {
-    setAppointments(prev => {
-      const appointmentToComplete = prev.upcoming.find(a => a.id === appointmentId);
-      if (!appointmentToComplete) return prev;
-      return {
-        ...prev,
-        upcoming: prev.upcoming.filter(a => a.id !== appointmentId),
-        past: [...prev.past, {
-          ...appointmentToComplete,
-          completionDate: new Date().toISOString().split('T')[0]
-        }]
-      };
-    });
+    const appointmentToComplete = appointmentsState.upcoming.find(a => a.id === appointmentId);
+    if (!appointmentToComplete) return;
+
+    appointmentsState = {
+      ...appointmentsState,
+      upcoming: appointmentsState.upcoming.filter(a => a.id !== appointmentId),
+      past: [...appointmentsState.past, {
+        ...appointmentToComplete,
+        completionDate: new Date().toISOString().split('T')[0]
+      }]
+    };
+    setAppointments(appointmentsState);
+    notifyListeners();
   };
 
   const moveToCancelled = (appointmentId) => {
-    setAppointments(prev => {
-      const appointmentToCancel = prev.upcoming.find(a => a.id === appointmentId);
-      if (!appointmentToCancel) return prev;
-      return {
-        ...prev,
-        upcoming: prev.upcoming.filter(a => a.id !== appointmentId),
-        cancelled: [...prev.cancelled, {
-          ...appointmentToCancel,
-          cancellationDate: new Date().toISOString().split('T')[0]
-        }]
-      };
-    });
+    const appointmentToCancel = appointmentsState.upcoming.find(a => a.id === appointmentId);
+    if (!appointmentToCancel) return;
+
+    appointmentsState = {
+      ...appointmentsState,
+      upcoming: appointmentsState.upcoming.filter(a => a.id !== appointmentId),
+      cancelled: [...appointmentsState.cancelled, {
+        ...appointmentToCancel,
+        cancellationDate: new Date().toISOString().split('T')[0]
+      }]
+    };
+    setAppointments(appointmentsState);
+    notifyListeners();
   };
 
   return { appointments, setAppointments, moveToPast, moveToCancelled };
@@ -226,7 +243,7 @@ export default function MyAppointments() {
   );
 }
 
-// Styles
+// Styles (unchanged)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
