@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     zIndex: 1,
-    padding: 8,
+    padding: 5,
   },
   titleContainer: {
     flex: 1,
@@ -43,9 +43,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
+    // paddingHorizontal:
   },
   headerRightPlaceholder: {
-    width: 40,
+    width:1,
   },
 });
 

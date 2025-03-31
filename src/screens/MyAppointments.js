@@ -5,8 +5,22 @@ import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
 import CustomModal from '../components/CustomModal';
 
-// Initial appointment data structure
-const initialAppointmentsData = {
+// Updated color scheme (kept as is)
+const COLORS = {
+  primary: '#2196F3',       // Vibrant blue
+  secondary: '#3A0CA3',     // Deep purple
+  success: '#4CAF50',       // Teal
+  danger: '#F44336',        // Pink
+  warning: '#F8961E',       // Orange
+  light: '#F8F9FA',         // Very light gray
+  dark: '#212529',          // Dark gray
+  muted: '#6C757D',         // Medium gray
+  white: '#FFFFFF',         // White
+  background: '#F5F7FF',    // Very light blue background
+};
+
+// Initial appointment data structure (kept as is)
+export const initialAppointmentsData = {
   upcoming: [
     {
       id: '1',
@@ -62,31 +76,56 @@ const AppointmentCard = ({ appointment, onComplete, onUpdate, onDelete, isCancel
       isPast && styles.pastCard
     ]}>
       <View style={styles.cardContent}>
-        <Image source={appointment.image} style={styles.doctorImage} />
+        <View style={styles.imageContainer}>
+          <Image source={appointment.image} style={styles.doctorImage} />
+        </View>
         <View style={styles.infoContainer}>
           <Text style={styles.doctorName}>{appointment.doctorName}</Text>
           <Text style={styles.designation}>{appointment.designation}</Text>
-          <Text style={styles.dateTime}>
-            {appointment.date} at {appointment.time}
-          </Text>
+          
+          <View style={styles.timeContainer}>
+            <Ionicons name="calendar-outline" size={16} color={COLORS.muted} />
+            <Text style={styles.dateTime}> {appointment.date}</Text>
+          </View>
+          <View style={styles.timeContainer}>
+            <Ionicons name="time-outline" size={16} color={COLORS.muted} />
+            <Text style={styles.dateTime}> {appointment.time}</Text>
+          </View>
+          
           {isCancelled && (
-            <Text style={styles.cancelledText}>CANCELLED</Text>
+            <View style={[styles.statusBadge, styles.cancelledBadge]}>
+              <Text style={styles.statusBadgeText}>Cancelled</Text>
+            </View>
           )}
           {isPast && !isCancelled && (
-            <Text style={styles.completedText}>COMPLETED</Text>
+            <View style={[styles.statusBadge, styles.completedBadge]}>
+              <Text style={styles.statusBadgeText}>Completed</Text>
+            </View>
           )}
         </View>
       </View>
       {!isCancelled && !isPast && (
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={[styles.button, styles.completeButton]} onPress={onComplete}>
-            <Text style={styles.buttonText}>Done</Text>
+          <TouchableOpacity 
+            style={[styles.button, styles.completeButton]} 
+            onPress={onComplete}
+          >
+            <Ionicons name="checkmark-circle" size={18} color={COLORS.white} />
+            <Text style={styles.buttonText}> Complete</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.updateButton]} onPress={onUpdate}>
-            <Text style={styles.buttonText}>Reschedule</Text>
+          <TouchableOpacity 
+            style={[styles.button, styles.updateButton]} 
+            onPress={onUpdate}
+          >
+            <Ionicons name="calendar" size={18} color={COLORS.white} />
+            <Text style={styles.buttonText}> Reschedule</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.deleteButton]} onPress={onDelete}>
-            <Text style={styles.buttonText}>Cancel</Text>
+          <TouchableOpacity 
+            style={[styles.button, styles.deleteButton]} 
+            onPress={onDelete}
+          >
+            <Ionicons name="close-circle" size={18} color={COLORS.white} />
+            <Text style={styles.buttonText}> Cancel</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -94,21 +133,23 @@ const AppointmentCard = ({ appointment, onComplete, onUpdate, onDelete, isCancel
   );
 };
 
-// TabButton component
+// Modern TabButton component (kept as is)
 const TabButton = ({ active, label, onPress }) => (
   <TouchableOpacity
     style={[styles.tabButton, active && styles.activeTabButton]}
     onPress={onPress}
+    activeOpacity={0.7}
   >
     <Text style={[styles.tabButtonText, active && styles.activeTabButtonText]}>
       {label}
     </Text>
+    {active && <View style={styles.activeTabIndicator} />}
   </TouchableOpacity>
 );
 
-// Custom hook to manage appointments state
+// Custom hook to manage appointments state (kept as is)
 export const useAppointments = () => {
-  const [appointments, setAppointments] = useState(appointmentsState);
+  const [appointments, setAppointments] = useState(initialAppointmentsData);
 
   const moveToPast = (appointmentId) => {
     const appointmentToComplete = appointmentsState.upcoming.find(a => a.id === appointmentId);
@@ -145,7 +186,7 @@ export const useAppointments = () => {
   return { appointments, setAppointments, moveToPast, moveToCancelled };
 };
 
-// Main MyAppointments component
+// Main MyAppointments component (kept as is)
 export default function MyAppointments() {
   const [activeTab, setActiveTab] = useState('upcoming');
   const [isModalVisible, setModalVisible] = useState(false);
@@ -188,7 +229,7 @@ export default function MyAppointments() {
     <View style={styles.container}>
       <Header title="My Appointments" />
       
-      {/* Tabs */}
+      {/* Modern Tabs */}
       <View style={styles.tabContainer}>
         <TabButton
           label="Upcoming"
@@ -208,7 +249,10 @@ export default function MyAppointments() {
       </View>
 
       {/* Content */}
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {appointments[activeTab]?.length > 0 ? (
           appointments[activeTab].map((appointment) => (
             <AppointmentCard
@@ -223,11 +267,16 @@ export default function MyAppointments() {
           ))
         ) : (
           <View style={styles.emptyContainer}>
-            <Ionicons name="calendar-outline" size={60} color="#ccc" />
+            <View style={styles.emptyIllustration}>
+              <Ionicons name="calendar-outline" size={80} color={COLORS.primary} />
+            </View>
             <Text style={styles.noAppointmentsText}>
               {activeTab === 'upcoming' && 'No upcoming appointments'}
               {activeTab === 'past' && 'No past appointments'}
               {activeTab === 'cancelled' && 'No cancelled appointments'}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {activeTab === 'upcoming' && 'Book an appointment to get started'}
             </Text>
           </View>
         )}
@@ -243,69 +292,88 @@ export default function MyAppointments() {
   );
 }
 
-// Styles (unchanged)
+// Modern Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: COLORS.background,
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    paddingHorizontal: 16,
   },
   tabButton: {
     flex: 1,
     paddingVertical: 16,
     alignItems: 'center',
+    position: 'relative',
   },
   activeTabButton: {
-    borderBottomWidth: 3,
-    borderBottomColor: '#2a7fba',
+    // Active state handled by indicator
+  },
+  activeTabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    height: 3,
+    width: '60%',
+    backgroundColor: COLORS.primary,
+    borderRadius: 3,
   },
   tabButtonText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 14,
+    color: COLORS.muted,
+    fontWeight: '500',
   },
   activeTabButtonText: {
-    color: '#2a7fba',
-    fontWeight: 'bold',
+    color: COLORS.primary,
+    fontWeight: '600',
   },
   scrollContainer: {
     flexGrow: 1,
-    padding: 16,
+    padding: 20,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cancelledCard: {
-    backgroundColor: '#fafafa',
+    backgroundColor: COLORS.white,
     borderLeftWidth: 4,
-    borderLeftColor: '#F44336',
+    borderLeftColor: COLORS.danger,
   },
   pastCard: {
-    backgroundColor: '#fafafa',
+    backgroundColor: COLORS.white,
     borderLeftWidth: 4,
-    borderLeftColor: '#2a7fba',
+    borderLeftColor: COLORS.success,
   },
   cardContent: {
     flexDirection: 'row',
     marginBottom: 12,
+    alignItems: 'center', // Align items vertically for better balance with larger image
+  },
+  imageContainer: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   doctorImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 90, // Increased from 70 to 90 for a more prominent look
+    height: 90, // Increased from 70 to 90
+    borderRadius: 15, // Slightly increased border radius for a softer look
     marginRight: 16,
+    borderWidth: 2,
+    borderColor: COLORS.light,
   },
   infoContainer: {
     flex: 1,
@@ -313,59 +381,77 @@ const styles = StyleSheet.create({
   },
   doctorName: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: 4,
+    color: COLORS.dark,
   },
   designation: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    color: COLORS.muted,
+    marginBottom: 8,
+  },
+  timeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6, // Slightly increased spacing between date and time
   },
   dateTime: {
-    fontSize: 14,
-    color: '#444',
+    fontSize: 16, // Increased from 14 to 16 for better readability
+    color: COLORS.dark,
+    marginLeft: 6, // Added a small margin for better spacing with the icon
   },
-  cancelledText: {
-    color: '#F44336',
-    fontWeight: 'bold',
-    marginTop: 4,
-    fontSize: 12,
-    textTransform: 'uppercase',
+  statusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 8,
   },
-  completedText: {
-    color: '#2a7fba',
-    fontWeight: 'bold',
-    marginTop: 4,
+  cancelledBadge: {
+    backgroundColor: '#FEEBEE',
+  },
+  completedBadge: {
+    backgroundColor: '#E3F2FD',
+  },
+  statusBadgeText: {
     fontSize: 12,
-    textTransform: 'uppercase',
+    fontWeight: '600',
+  },
+  cancelledBadgeText: {
+    color: COLORS.danger,
+  },
+  completedBadgeText: {
+    color: COLORS.primary,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginTop: 12,
   },
   button: {
     paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 6,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
     marginHorizontal: 4,
+    flexDirection: 'row',
   },
   completeButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: COLORS.success,
   },
   updateButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: COLORS.primary,
   },
   deleteButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: COLORS.danger,
   },
   buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: COLORS.white,
+    fontWeight: '500',
     fontSize: 14,
+    marginLeft: 4,
   },
   emptyContainer: {
     flex: 1,
@@ -373,10 +459,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 60,
   },
+  emptyIllustration: {
+    backgroundColor: '#E3F2FD',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   noAppointmentsText: {
     textAlign: 'center',
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
+    marginTop: 8,
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.dark,
+  },
+  emptySubtext: {
+    textAlign: 'center',
+    marginTop: 8,
+    fontSize: 14,
+    color: COLORS.muted,
+    maxWidth: '70%',
   },
 });

@@ -7,7 +7,7 @@ export default function CustomStatusBar() {
   return (
     <StatusBar 
       style={colorScheme === 'dark' ? 'light' : 'dark'}
-      backgroundColor={colorScheme === 'dark' ? '#103D66' : '#2a7fba'}
+      backgroundColor={colorScheme === 'dark' ? '#2a7fba' : '#333'}
       translucent={false}
     />
   );

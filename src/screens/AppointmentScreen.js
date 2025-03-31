@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { 
   View, Text, TouchableOpacity, FlatList, Alert, Image, StyleSheet 
 } from "react-native";
@@ -7,29 +7,29 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import DropDown from './../components/old_components/DropDown';
 import { router } from "expo-router";
 import Header from '../components/Header';
-
-const doctorList = [
-  { id: "1", name: "Dr. Hamza Tariq", specialty: "Odontology", time: "10:30 AM - 3:30 PM", fee: "1000/-", rating: 4.5, image: { uri: "https://randomuser.me/api/portraits/men/1.jpg" } },
-  { id: "2", name: "Dr. Sarah Ahmed", specialty: "Neurology", time: "9:00 AM - 2:00 PM", fee: "1500/-", rating: 4.8, image: { uri: "https://randomuser.me/api/portraits/women/2.jpg" } },
-  { id: "3", name: "Dr. Ali Khan", specialty: "Cardiology", time: "11:00 AM - 4:00 PM", fee: "2000/-", rating: 4.7, image: { uri: "https://randomuser.me/api/portraits/men/3.jpg" } },
-  { id: "4", name: "Dr. Roshit", specialty: "Cardiology", time: "11:00 AM - 4:00 PM", fee: "2000/-", rating: 4.7, image: { uri: "https://randomuser.me/api/portraits/men/3.jpg" } },
-  { id: "5", name: "Dr. Sovit", specialty: "Cardiology", time: "11:00 AM - 4:00 PM", fee: "2000/-", rating: 4.7, image: { uri: "https://randomuser.me/api/portraits/men/3.jpg" } },
-];
-
-const specialties = [
-  { label: "All", value: "All" },
-  { label: "Odontology", value: "Odontology" },
-  { label: "Neurology", value: "Neurology" },
-  { label: "Cardiology", value: "Cardiology" },
-];
+import { getequipmentlistview } from "../services/productServices";
 
 const AppointmentScreen = () => {
   const [selectedSpecialty, setSelectedSpecialty] = useState("All");
   const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [doctorList, setDoctorList] = useState([]);
+  const [specialties, setSpecialties] = useState([{ label: "All", value: "All" }]);
+
+  // Extract unique specialties when doctorList changes
+  useEffect(() => {
+    if (doctorList.length > 0) {
+      const uniqueSpecialties = [...new Set(doctorList.map(doctor => doctor.equipment_type))];
+      const specialtyOptions = uniqueSpecialties.map(specialty => ({
+        label: specialty,
+        value: specialty
+      }));
+      setSpecialties([{ label: "All", value: "All" }, ...specialtyOptions]);
+    }
+  }, [doctorList]);
 
   const filteredDoctors = selectedSpecialty === "All" 
     ? doctorList 
-    : doctorList.filter(doctor => doctor.specialty === selectedSpecialty);
+    : doctorList.filter(doctor => doctor.equipment_type === selectedSpecialty);
 
   const BookDateTime = () => {
     if (!selectedDoctor) {
@@ -41,20 +41,25 @@ const AppointmentScreen = () => {
       pathname: "/DateTime",
       params: {
         name: selectedDoctor.name,
-        specialty: selectedDoctor.specialty,
-        image: selectedDoctor.image.uri, 
-        time: selectedDoctor.time,
+        specialty: selectedDoctor.equipment_type,
+        image: selectedDoctor.image, 
+        time: selectedDoctor.start_time,
         fee: selectedDoctor.fee,
         rating: selectedDoctor.rating,
       },
     });
   };
 
+  useEffect(() => {
+    getequipmentlistview()
+      .then((res) => setDoctorList(res.data))
+      .catch((error) => console.error("equipment list load failed:", error));
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
       
-      {/* Replace the old header with your reusable Header component */}
       <Header title="Book an Appointment" />
       
       <View style={styles.contentContainer}>
@@ -73,7 +78,7 @@ const AppointmentScreen = () => {
         <Text style={styles.subHeader}>Available Doctors</Text>
         <FlatList
           data={filteredDoctors}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id.toString()}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <TouchableOpacity 
@@ -83,11 +88,11 @@ const AppointmentScreen = () => {
               ]}
               onPress={() => setSelectedDoctor(item)}
             >
-              <Image source={item.image} style={styles.doctorImage} />
+              <Image source={{uri: item.image}} style={styles.doctorImage} />
               <View style={styles.doctorInfo}>
                 <Text style={styles.doctorName}>{item.name}</Text>
-                <Text style={styles.doctorSpecialty}>{item.specialty}</Text>
-                <Text style={styles.doctorDetails}>⏰ Available: {item.time}</Text>
+                <Text style={styles.doctorSpecialty}>{item.equipment_type}</Text>
+                <Text style={styles.doctorDetails}>⏰ Available: {item.start_time}</Text>
                 <Text style={styles.doctorDetails}>💰 Fee: {item.fee}</Text>
                 <Text style={styles.doctorDetails}>⭐ Rating: {item.rating}</Text>
               </View>
@@ -124,7 +129,7 @@ const styles = StyleSheet.create({
   contentContainer: { 
     flex: 1, 
     padding: 20,
-    paddingTop: 10 // Reduced top padding since Header is separate
+    paddingTop: 10
   },
   subHeader: { 
     fontSize: 18, 

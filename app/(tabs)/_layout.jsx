@@ -5,7 +5,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 
 const _layout = () => {
   return (
-    <Tabs screenOptions={{ tabBarActiveTintColor: "blue" }}>
+    <Tabs screenOptions={{ tabBarActiveTintColor: "#2a7fba" }}>
       <Tabs.Screen
         name="home"
         options={{
@@ -37,7 +37,6 @@ const _layout = () => {
           ),
         }}
       ></Tabs.Screen>
-      {/* <Tabs.Screen name='profile'/> */}
     </Tabs>
   );
 };
