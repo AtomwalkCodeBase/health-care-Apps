@@ -17,6 +17,7 @@ export default function RootLayout() {
       <Stack.Screen name="BookingAppointment/index" options={{headerShown:false}}/>
       <Stack.Screen name="DateTime/index" options={{headerShown:false}}/>
       <Stack.Screen name="MyAccount/index" options={{headerShown:false}}/>
+      <Stack.Screen name="BookingConfirmation/index" options={{headerShown:false}}/>
 
     </Stack>
     </AppProvider>

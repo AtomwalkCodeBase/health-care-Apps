@@ -1,13 +1,13 @@
 import React, { useState } from "react";
-import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Dimensions } from "react-native";
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Modal } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import Header from "../components/Header";
 import { StatusBar } from "expo-status-bar";
-import CustomModal from "../components/CustomModal";
-import Modal from "react-native-modal";
+import { Calendar } from 'react-native-calendars';
 
 const DateTimeForm = () => {
+  const router = useRouter();
   const params = useLocalSearchParams();
   const doctor = {
     name: params.name || "Dr. Kevon Lane",
@@ -19,51 +19,85 @@ const DateTimeForm = () => {
     image: params.image || "https://via.placeholder.com/100",
   };
 
-  const [selectedDate, setSelectedDate] = useState("Fri 16");
-  const [selectedTime, setSelectedTime] = useState(null);
-  const [isModalVisible, setModalVisible] = useState(false);
-  const [bookingConfirmed, setBookingConfirmed] = useState(false);
+  // Generate dates for the current week
+  const generateWeekDates = () => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const today = new Date();
+    const currentDate = today.getDate();
+    const currentDay = today.getDay();
+    
+    return Array.from({ length: 7 }).map((_, i) => {
+      const date = new Date(today);
+      date.setDate(currentDate + (i - currentDay));
+      const dayName = days[date.getDay()];
+      const dayNum = date.getDate();
+      return `${dayName} ${dayNum}`;
+    });
+  };
 
-  const dates = ["Fri 16", "Sat 17", "Sun 18", "Mon 19", "Tue 20"];
+  const [dates, setDates] = useState(generateWeekDates());
+  const [selectedDate, setSelectedDate] = useState(generateWeekDates()[0]);
+  const [selectedTime, setSelectedTime] = useState(null);
+  const [showCalendar, setShowCalendar] = useState(false);
+
   const timeSlots = [
-    "09:00 AM", "10:00 AM", "11:00 AM",
-    "12:00 PM", "02:00 PM", "03:00 PM",
-    "06:00 PM", "07:00 PM", "08:00 PM"
+    { start: "08:00 AM", end: "09:00 AM", status: "Available" },
+    { start: "09:00 AM", end: "10:00 AM", status: "Booked" },
+    { start: "10:00 AM", end: "11:00 AM", status: "Available" },
+    { start: "11:00 AM", end: "12:00 PM", status: "Available" },
+    { start: "12:00 PM", end: "01:00 PM", status: "Booked" },
+    { start: "01:00 PM", end: "02:00 PM", status: "Booked" },
+    { start: "02:00 PM", end: "03:00 PM", status: "Available" },
+    { start: "03:00 PM", end: "04:00 PM", status: "Available" },
+    { start: "04:00 PM", end: "05:00 PM", status: "Available" },
+    { start: "05:00 PM", end: "06:00 PM", status: "Booked" },
+    { start: "06:00 PM", end: "07:00 PM", status: "Available" },
+    { start: "07:00 PM", end: "08:00 PM", status: "Available" },
   ];
 
-  // Helper functions for formatting
-  const formatDate = (date) => {
-    return `${date} February 2025`;
+  const handleTimeSelection = (slot) => {
+    if (slot.status === "Booked") return;
+    if (selectedTime === slot.start) {
+      setSelectedTime(null);
+    } else {
+      setSelectedTime(slot.start);
+    }
   };
 
-  const formatTime = (time) => {
-    return time;
-  };
-
-  const calculateEndTime = (startTime) => {
-    const [time, period] = startTime.split(" ");
-    const [hours, minutes] = time.split(":");
-    let newHours = parseInt(hours) + 1;
-    if (newHours > 12) newHours -= 12;
-    return `${newHours.toString().padStart(2, '0')}:${minutes} ${period}`;
+  const handleCalendarSelect = (day) => {
+    const date = new Date(day.dateString);
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayName = days[date.getDay()];
+    const dayNum = date.getDate();
+    const formattedDate = `${dayName} ${dayNum}`;
+    
+    const newWeekDates = Array.from({ length: 7 }).map((_, i) => {
+      const newDate = new Date(date);
+      newDate.setDate(date.getDate() + (i - date.getDay()));
+      const newDayName = days[newDate.getDay()];
+      const newDayNum = newDate.getDate();
+      return `${newDayName} ${newDayNum}`;
+    });
+    
+    setDates(newWeekDates);
+    setSelectedDate(formattedDate);
+    setShowCalendar(false);
   };
 
   const handleSubmit = () => {
     if (selectedTime) {
-      setModalVisible(true);
-    }
-  };
-
-  const handleConfirmation = () => {
-    setBookingConfirmed(true);
-    setModalVisible(false);
-  };
-
-  const handleTimeSelection = (slot) => {
-    if (selectedTime === slot) {
-      setSelectedTime(null);
-    } else {
-      setSelectedTime(slot);
+      const slot = timeSlots.find(s => s.start === selectedTime);
+      router.push({
+        pathname: "/BookingConfirmation",
+        params: {
+          doctorName: doctor.name,
+          specialty: doctor.specialty,
+          image: doctor.image,
+          date: selectedDate,
+          time: `${slot.start} - ${slot.end}`,
+          fee: doctor.fee
+        }
+      });
     }
   };
 
@@ -73,7 +107,6 @@ const DateTimeForm = () => {
       <Header title="Book an Appointment" />
       
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Doctor Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.profileImageContainer}>
             <Image source={{ uri: doctor.image }} style={styles.doctorImage} />
@@ -84,7 +117,6 @@ const DateTimeForm = () => {
           <Text style={styles.education}>{doctor.education.join(" • ")}</Text>
         </View>
 
-        {/* Stats Cards Row */}
         <View style={styles.statsRow}>
           <View style={[styles.statCard, { backgroundColor: '#E3F2FD' }]}>
             <Icon name="work" size={24} color="#2a7fba" />
@@ -105,45 +137,51 @@ const DateTimeForm = () => {
           </View>
         </View>
 
-        {/* Available Time Section */}
-        <Text style={styles.sectionHeader}>Available Time</Text>
+        <View style={styles.sectionHeaderContainer}>
+          <Text style={styles.sectionHeader}>Select Date</Text>
+          <TouchableOpacity 
+            style={styles.calendarButton}
+            onPress={() => setShowCalendar(true)}
+          >
+            <Icon name="calendar-today" size={20} color="#2a7fba" />
+          </TouchableOpacity>
+        </View>
         
-        {/* Date Picker Card */}
         <View style={styles.dateCard}>
-          <View style={styles.monthHeader}>
-            <Text style={styles.monthText}>February</Text>
-            <View style={styles.arrowsContainer}>
-              <Icon name="chevron-left" size={24} color="#2a7fba" />
-              <Icon name="chevron-right" size={24} color="#2a7fba" style={{ marginLeft: 15 }} />
-            </View>
-          </View>
-          
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.datesContainer}
           >
-            {dates.map((date) => (
-              <TouchableOpacity
-                key={date}
-                style={[
-                  styles.dateButton, 
-                  selectedDate === date && styles.selectedDate
-                ]}
-                onPress={() => setSelectedDate(date)}
-              >
-                <Text style={[
-                  styles.dateText,
-                  selectedDate === date && styles.selectedDateText
-                ]}>
-                  {date}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {dates.map((date) => {
+              const [dayName, dayNum] = date.split(" ");
+              return (
+                <TouchableOpacity
+                  key={date}
+                  style={[
+                    styles.dateButton, 
+                    selectedDate === date && styles.selectedDate
+                  ]}
+                  onPress={() => setSelectedDate(date)}
+                >
+                  <Text style={[
+                    styles.dayText,
+                    selectedDate === date && styles.selectedDateText
+                  ]}>
+                    {dayName}
+                  </Text>
+                  <Text style={[
+                    styles.dateNumText,
+                    selectedDate === date && styles.selectedDateText
+                  ]}>
+                    {dayNum}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
 
-        {/* Time Slots Card */}
         <View style={styles.timeCard}>
           <Text style={styles.sectionTitle}>Available Time Slots</Text>
           <View style={styles.timeGrid}>
@@ -152,23 +190,33 @@ const DateTimeForm = () => {
                 key={index}
                 style={[
                   styles.timeSlot,
-                  selectedTime === slot && styles.selectedTimeSlot
+                  selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeSlot,
+                  slot.status === "Booked" && styles.bookedTimeSlot
                 ]}
                 onPress={() => handleTimeSelection(slot)}
+                disabled={slot.status === "Booked"}
               >
                 <Text style={[
-                  styles.timeText,
-                  selectedTime === slot && styles.selectedTimeText
+                  styles.timeRangeText,
+                  selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeText,
+                  slot.status === "Booked" && styles.bookedTimeText
                 ]}>
-                  {slot}
+                  {`${slot.start} - ${slot.end}`}
                 </Text>
+                <View style={[
+                  styles.statusBadge,
+                  slot.status === "Available" ? styles.availableBadge : styles.bookedBadge
+                ]}>
+                  <Text style={styles.statusText}>
+                    {slot.status}
+                  </Text>
+                </View>
               </TouchableOpacity>
             ))}
           </View>
         </View>
       </ScrollView>
 
-      {/* Book Appointment Button */}
       <TouchableOpacity 
         style={[
           styles.bookButton,
@@ -178,53 +226,49 @@ const DateTimeForm = () => {
         onPress={handleSubmit}
       >
         <View style={styles.buttonContent}>
-          <Text style={styles.bookButtonText}>Confirm Booking</Text>
+          <Text style={styles.bookButtonText}>Select Appointment</Text>
           <Icon name="check-circle" size={20} color="white" />
         </View>
       </TouchableOpacity>
 
-      {/* Initial Confirmation Modal */}
-      <CustomModal 
-        isModalVisible={isModalVisible}
-        onpressyes={handleConfirmation}
-        onpresno={() => setModalVisible(false)}
-        cancelclick={false}
-        movetocancel={null}
-      />
-
-      {/* Success Confirmation Modal */}
-      <Modal 
-        isVisible={bookingConfirmed} 
-        animationIn="fadeIn" 
-        animationOut="fadeOut"
+      {/* Calendar Modal - This should appear on top of other content */}
+      <Modal
+        visible={showCalendar}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCalendar(false)}
       >
-        <View style={styles.modalContent}>
-          <Icon 
-            name="check-circle" 
-            size={60} 
-            color="#4CAF50" 
-            style={styles.modalIcon} 
-          />
-          <Text style={styles.modalTitle}>Appointment Confirmed!</Text>
-          <Text style={styles.modalText}>
-            Your appointment with {doctor.name} is booked on {formatDate(selectedDate)} 
-            from {formatTime(selectedTime)} to {selectedTime ? calculateEndTime(selectedTime) : ""}
-          </Text>
-          <TouchableOpacity 
-            style={styles.okButton}
-            onPress={() => {
-              setBookingConfirmed(false);
-              // You might want to navigate back here
-              // router.back();
-            }}
-          >
-            <Text style={styles.okButtonText}>OK</Text>
-          </TouchableOpacity>
+        <View style={styles.modalOverlay}>
+          <View style={styles.calendarContainer}>
+            <Calendar
+              onDayPress={handleCalendarSelect}
+              theme={{
+                backgroundColor: '#ffffff',
+                calendarBackground: '#ffffff',
+                textSectionTitleColor: '#2a7fba',
+                selectedDayBackgroundColor: '#2a7fba',
+                selectedDayTextColor: '#ffffff',
+                todayTextColor: '#2a7fba',
+                dayTextColor: '#2c3e50',
+                textDisabledColor: '#d9d9d9',
+                arrowColor: '#2a7fba',
+                monthTextColor: '#2c3e50',
+                indicatorColor: '#2a7fba',
+              }}
+            />
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowCalendar(false)}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
@@ -315,12 +359,23 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 4,
   },
+  sectionHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    marginLeft: 8,
+    marginRight: 8,
+  },
   sectionHeader: {
     fontSize: 18,
     fontWeight: "600",
     color: "#2c3e50",
-    marginBottom: 12,
-    marginLeft: 8,
+  },
+  calendarButton: {
+    backgroundColor: '#f0f0f0',
+    padding: 8,
+    borderRadius: 20,
   },
   dateCard: {
     backgroundColor: "#ffffff",
@@ -333,40 +388,37 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  monthHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  monthText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#2c3e50",
-  },
-  arrowsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
   datesContainer: {
     paddingHorizontal: 4,
   },
   dateButton: {
-    paddingHorizontal: 16,
+    width: 60,
     paddingVertical: 12,
     marginRight: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    backgroundColor: "#fafafa",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  dateText: {
-    fontSize: 16,
+  dayText: {
+    fontSize: 14,
     color: "#666",
     fontWeight: "500",
   },
+  dateNumText: {
+    fontSize: 18,
+    color: "#666",
+    fontWeight: "500",
+    marginTop: 4,
+  },
   selectedDate: {
-    backgroundColor: "#E3F2FD",
-    borderRadius: 8,
+    backgroundColor: "#2a7fba",
+    borderColor: "#2a7fba",
   },
   selectedDateText: {
-    color: "#2a7fba",
+    color: "white",
     fontWeight: "600",
   },
   timeCard: {
@@ -391,26 +443,53 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   timeSlot: {
-    width: Dimensions.get('window').width / 3 - 22,
+    width: '48%',
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: "#e0e0e0",
     borderRadius: 8,
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#fafafa",
   },
   selectedTimeSlot: {
     backgroundColor: "#2a7fba",
     borderColor: "#2a7fba",
   },
-  timeText: {
+  bookedTimeSlot: {
+    backgroundColor: "#EAEAEA",
+    borderColor: "#e0e0e0",
+  },
+  timeRangeText: {
     fontSize: 14,
     color: "#666",
     fontWeight: "500",
+    textAlign: "center",
+    marginBottom: 4,
   },
   selectedTimeText: {
     color: "white",
+  },
+  bookedTimeText: {
+    color: "#999",
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  availableBadge: {
+    backgroundColor: "#E8F5E9",
+  },
+  bookedBadge: {
+    backgroundColor: "#DBDBDB",
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#2c3e50",
   },
   bookButton: {
     position: "absolute",
@@ -469,6 +548,46 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  calendarModal: {
+    justifyContent: 'flex-start',
+    marginTop: 60,
+    marginBottom: 0,
+    marginHorizontal: 20,
+  },
+  calendarContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 10,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  calendarContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+  closeButton: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#2a7fba',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 
