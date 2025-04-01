@@ -15,6 +15,7 @@ import { getProfileInfo } from "../services/authServices";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { getemployelistview } from "../services/productServices";
 import { getAppointments, subscribeToAppointments } from "./MyAppointments";
+import { StatusBar } from "expo-status-bar";
 
 // Constants
 const COLORS = {
@@ -112,10 +113,11 @@ const HomeScreen = () => {
 
   const toggleSortOrder = () => setIsAscending(!isAscending);
 
-  const handleDoctorPress = (name) => {
+  const handleDoctorPress = (name,image) => {
     router.push({
       pathname: "/DoctorDetails",
-      params: { name: name },
+      params: { name: name,image: image },
+             
     });
   };
 
@@ -149,9 +151,9 @@ const HomeScreen = () => {
   const DoctorCard = ({ item }) => (
     <TouchableOpacity
       style={styles.doctorCard}
-      onPress={() => handleDoctorPress(item.name)}
+      onPress={() => handleDoctorPress(item.name, item.image)}
     >
-      <Image source={{ uri: item?.image }} style={styles.doctorImage} />
+      <Image source={{ uri: item.image }} style={styles.doctorImage} />
       <View style={styles.doctorInfo}>
         <Text style={styles.doctorName}>{item.name}</Text>
         <Text style={styles.doctorSpecialty}>
@@ -167,6 +169,7 @@ const HomeScreen = () => {
 
   return (
     <View style={styles.container}>
+      <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Image source={{ uri: profile?.image }} style={styles.profileImage} />
@@ -344,10 +347,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   doctorImage: {
-    width: 55,
-    height: 55,
+    width: 70,
+    height: 70,
     borderRadius: 30,
     marginRight: 15,
+    justifyContent: "center",
+    resizeMode: "cover",
+    alignItems: "center",
   },
   doctorInfo: {
     flex: 1,

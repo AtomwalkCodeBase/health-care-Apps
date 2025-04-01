@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -6,207 +6,278 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  SafeAreaView,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import Header from "../../src/components/Header";
 import { router, useLocalSearchParams } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 
 const DoctorProfile = () => {
   const item = useLocalSearchParams();
 
+  // Define the stats and fees data
+  const statsData = [
+    { value: "12 years", label: "Experience" },
+    { value: "4.8", label: "Rating" },
+    { value: "2500+", label: "Patients" },
+  ];
+  const feesData = [
+    { value: "₹300", label: "Consultation Fee" },
+    { value: "₹150", label: "Follow-up Fee" },
+    { value: "30 mins", label: "Avg. Session" },
+    { value: "95%", label: "Success Rate" },
+  ];
+
   const handleBack = () => {
-    router.back()
+    router.back();
   };
 
+  // Extract values for the About text
+  const experience = statsData.find((stat) => stat.label === "Experience").value;
+  const rating = statsData.find((stat) => stat.label === "Rating").value;
+  const patients = statsData.find((stat) => stat.label === "Patients").value;
+  const successRate = feesData.find((fee) => fee.label === "Success Rate").value;
+
   return (
-    <ScrollView style={styles.headercontainer}>
-      {/* Header */}
-      <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
-      <Header title="Doctor Profile" />
-    <View style={styles.profileCard}>
-      {/* Profile Card */}
-      <View>
-        <Image
-          source={{ uri: item.Image }}
-          style={styles.profileImage}
-        />
-        <Text style={styles.name}>{item.name}</Text>
-        <Text style={styles.speciality}>Cardiologist</Text>
-      </View>
+    <SafeAreaView style={styles.mainContainer}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Header */}
+        <View style={styles.headerContainer}>
+          <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
+          <Header title="Doctor Profile" />
+        </View>
 
-      {/* Experience, Rating, and Patients Cards */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>12 years</Text>
-          <Text style={styles.statLabel}>Experience</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>4.8</Text>
-          <Text style={styles.statLabel}>Rating</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>2500+</Text>
-          <Text style={styles.statLabel}>Patients</Text>
-        </View>
-      </View>
+        <View style={styles.contentContainer}>
+          {/* Profile Card */}
+          <View style={styles.profileCard}>
+            <LinearGradient
+              colors={["#ffffff", "#f7f9fc"]}
+              style={styles.profileGradient}
+            >
+              <Image
+                source={{ uri: item.image }}
+                style={styles.profileImage}
+              />
+              <Text style={styles.name}>{item.name}</Text>
+              <Text style={styles.speciality}>Cardiologist</Text>
+            </LinearGradient>
+          </View>
 
-      {/* About Section */}
-      <View style={styles.aboutContainer}>
-        <Text style={styles.sectionTitle}>About</Text>
-        <Text style={styles.aboutText}>
-          Dr. Thomas Michael is a highly experienced cardiologist with 15+ years
-          of expertise in diagnosing and treating heart-related conditions. He
-          specializes in managing hypertension, heart disease, and related problems.
-        </Text>
-      </View>
+          {/* Stats Section */}
+          <View style={styles.statsContainer}>
+            {statsData.map((stat, index) => (
+              <View key={index} style={styles.statCard}>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </View>
+            ))}
+          </View>
 
-      {/* Fees & Session Cards */}
-      <View style={styles.feesContainer}>
-        <View style={styles.feeCard}>
-          <Text style={styles.feeValue}>₹300</Text>
-          <Text style={styles.feeLabel}>Consultation Fee</Text>
-        </View>
-        <View style={styles.feeCard}>
-          <Text style={styles.feeValue}>30 mins</Text>
-          <Text style={styles.feeLabel}>Avg. Session</Text>
-        </View>
-        <View style={styles.feeCard}>
-          <Text style={styles.feeValue}>1500+</Text>
-          <Text style={styles.feeLabel}>Attended Patients</Text>
-        </View>
-      </View>
-      </View>
+          {/* About Section with Mapped Data */}
+          <View style={styles.aboutContainer}>
+            <Text style={styles.sectionTitle}>About</Text>
+            <Text style={styles.aboutText}>
+              Dr. Thomas Michael is a highly experienced cardiologist with{" "}
+              <Text style={styles.highlight}>{experience}</Text> of expertise in
+              diagnosing and treating heart-related conditions. He has attended
+              to over <Text style={styles.highlight}>{patients}</Text>{" "}
+              patients, achieving an impressive{" "}
+              <Text style={styles.highlight}>{successRate}</Text> success rate.
+              His exceptional skills are reflected in his{" "}
+              <Text style={styles.highlight}>{rating}</Text> rating, making him
+              a trusted specialist in managing hypertension, heart disease, and
+              related problems.
+            </Text>
+          </View>
 
-      {/* Continue Button */}
-      <TouchableOpacity onPress={handleBack} style={styles.continueButton}>
-        <Text style={styles.continueButtonText}>Continue</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          {/* Fees Section with 4 Cards */}
+          <View style={styles.feesContainer}>
+            {feesData.map((fee, index) => (
+              <LinearGradient
+                key={index}
+                colors={["#ffffff", "#f7f9fc"]}
+                style={styles.feeCard}
+              >
+                <Text style={styles.feeValue}>{fee.value}</Text>
+                <Text style={styles.feeLabel}>{fee.label}</Text>
+              </LinearGradient>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Fixed Continue Button */}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity onPress={handleBack} style={styles.continueButton}>
+          <LinearGradient
+            colors={["#2a7fba", "#1e6ca0"]}
+            style={styles.buttonGradient}
+          >
+            <Text style={styles.continueButtonText}>Continue</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  headercontainer: {
+  mainContainer: {
     flex: 1,
     backgroundColor: "#F8F9FA",
-    // padding: 18,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+  },
+  headerContainer: {
     marginTop: 45,
   },
-  container: {
-    flex: 1,
-    backgroundColor: "#F8F9FA",
+  contentContainer: {
     padding: 16,
   },
   profileCard: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 20,
-    alignItems: "center",
+    borderRadius: 20,
+    overflow: "hidden",
+    elevation: 6,
     shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+  },
+  profileGradient: {
+    padding: 24,
+    alignItems: "center",
   },
   profileImage: {
-    width: 110,
-    height: 110,
-    borderRadius: 75,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2,
+    borderColor: "#2a7fba",
   },
   name: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginTop: 8,
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#1e2a44",
+    marginTop: 12,
   },
   speciality: {
-    color: "gray",
-    textAlign: "center",
+    fontSize: 16,
+    color: "#6b7280",
+    marginTop: 4,
   },
   statsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 16,
+    marginTop: 20,
+    gap: 10,
   },
   statCard: {
     flex: 1,
-    backgroundColor: "white",
-    borderRadius: 12,
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
     padding: 16,
     alignItems: "center",
-    marginHorizontal: 4,
+    elevation: 4,
     shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 6,
   },
   statValue: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#2c3e50",
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#2a7fba",
   },
   statLabel: {
     fontSize: 12,
-    color: "#666",
+    color: "#6b7280",
     marginTop: 4,
+    textTransform: "uppercase",
   },
   aboutContainer: {
-    backgroundColor: "white",
-    padding: 16,
-    borderRadius: 10,
-    marginTop: 16,
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    padding: 20,
+    marginTop: 20,
+    elevation: 4,
     shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 6,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 8,
-    color: "#2c3e50",
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1e2a44",
+    marginBottom: 10,
   },
   aboutText: {
-    color: "gray",
-    fontSize: 14,
+    fontSize: 15,
+    color: "#6b7280",
+    lineHeight: 22,
+  },
+  highlight: {
+    fontWeight: "600",
+    color: "#2a7fba",
   },
   feesContainer: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
-    marginTop: 16,
+    marginTop: 20,
+    gap: 12,
   },
   feeCard: {
-    flex: 1,
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 16,
+    width: "48%",
+    borderRadius: 16,
+    padding: 20,
     alignItems: "center",
-    marginHorizontal: 4,
+    elevation: 4,
     shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 6,
+    marginBottom: 12,
   },
   feeValue: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#2c3e50",
+    fontSize: 22,
+    fontWeight: "600",
+    color: "#2a7fba",
   },
   feeLabel: {
     fontSize: 12,
-    color: "#666",
-    marginTop: 4,
+    color: "#6b7280",
+    marginTop: 6,
+    textTransform: "uppercase",
+  },
+  buttonContainer: {
+    position: "absolute",
+    bottom: 20,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    alignItems: "center",
   },
   continueButton: {
-    backgroundColor: "#2a7fba",
-    padding: 18,
     borderRadius: 30,
+    overflow: "hidden",
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    width: "100%",
+  },
+  buttonGradient: {
+    paddingVertical: 16,
     alignItems: "center",
-    marginTop: 24,
-    marginBottom: 40,
   },
   continueButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
+    color: "#ffffff",
+    fontWeight: "600",
+    fontSize: 18,
   },
 });
 
