@@ -4,41 +4,98 @@ import Icon from "react-native-vector-icons/MaterialIcons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Header from "../../src/components/Header";
 import { StatusBar } from "expo-status-bar";
+import * as Calendar from 'expo-calendar';
 
 const BookingConfirmation = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
 
-  // Format the date to show day, date and year
+  // Format the date to show day, date, and year
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-    // Assuming dateString is in "Day Num" format (e.g., "Mon 15")
     const [dayAbbr, dayNum] = dateString.split(" ");
     const dayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(dayAbbr);
     const date = new Date();
     date.setDate(parseInt(dayNum));
-    date.setMonth(new Date().getMonth()); // Assuming current month for simplicity
-    date.setFullYear(new Date().getFullYear()); // Assuming current year
+    date.setMonth(new Date().getMonth());
+    date.setFullYear(new Date().getFullYear());
 
-    const dayName = days[dayIndex];
-    const monthName = months[date.getMonth()];
-    const year = date.getFullYear();
+    return `${days[dayIndex]}, ${dayNum} ${months[date.getMonth()]} ${date.getFullYear()}`;
+  };
 
-    return `${dayName}, ${dayNum} ${monthName} ${year}`;
+  // Parse date and time for calendar event
+  const parseDateTime = (dateString, timeString) => {
+    const [dayAbbr, dayNum] = dateString.split(" ");
+    const [time, period] = timeString.split(" ");
+    let [hours, minutes] = time.split(":");
+    hours = parseInt(hours);
+    if (period === "PM" && hours !== 12) hours += 12;
+    if (period === "AM" && hours === 12) hours = 0;
+
+    const date = new Date();
+    date.setDate(parseInt(dayNum));
+    date.setMonth(new Date().getMonth());
+    date.setFullYear(new Date().getFullYear());
+    date.setHours(hours);
+    date.setMinutes(parseInt(minutes));
+    date.setSeconds(0);
+
+    return date;
+  };
+
+  // Add event to calendar
+  const addEventToCalendar = async () => {
+    try {
+      const { status } = await Calendar.requestCalendarPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Permission to access calendar was denied');
+        return;
+      }
+
+      // Fetch all calendars and find a writable one
+      const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+      const writableCalendar = calendars.find(cal => cal.allowsModifications) || calendars[0];
+
+      if (!writableCalendar) {
+        alert('No writable calendar found on this device');
+        return;
+      }
+
+      const startDate = parseDateTime(params.date, params.time);
+      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1-hour duration
+
+      const eventDetails = {
+        title: `Appointment with ${params.doctorName}`,
+        startDate,
+        endDate,
+        location: 'Clinic',
+        notes: `Specialty: ${params.specialty}, Fee: ${params.fee}`,
+        calendarId: writableCalendar.id,
+      };
+
+      const eventId = await Calendar.createEventAsync(writableCalendar.id, eventDetails);
+      alert('Event added to calendar successfully!');
+      setShowCalendarModal(false);
+      router.push("/home");
+    } catch (error) {
+      console.error('Error adding event:', error);
+      alert('Failed to add event to calendar: ' + error.message);
+    }
   };
 
   const handleConfirmBooking = () => {
-    setShowConfirmModal(true); // Show confirmation modal
+    setShowConfirmModal(true);
   };
 
   const handleConfirmYes = () => {
     setShowConfirmModal(false);
-    setShowSuccessModal(true); // Show success modal
+    setShowSuccessModal(true);
   };
 
   const handleConfirmNo = () => {
@@ -47,7 +104,12 @@ const BookingConfirmation = () => {
 
   const handleSuccessOk = () => {
     setShowSuccessModal(false);
-    router.push("/book"); // Redirect to home.js
+    setShowCalendarModal(true);
+  };
+
+  const handleCalendarCancel = () => {
+    setShowCalendarModal(false);
+    router.push("/home");
   };
 
   return (
@@ -124,7 +186,7 @@ const BookingConfirmation = () => {
       {/* Confirm Button */}
       <TouchableOpacity 
         style={styles.confirmButton}
-        onPress={handleConfirmBooking} // Updated to trigger modal
+        onPress={handleConfirmBooking}
       >
         <Text style={styles.confirmButtonText}>Confirm Booking</Text>
         <Icon name="check-circle" size={20} color="white" style={styles.buttonIcon} />
@@ -169,15 +231,40 @@ const BookingConfirmation = () => {
             <Icon name="check-circle" size={50} color="#4CAF50" style={styles.successIcon} />
             <Text style={styles.modalTitle}>Appointment Booked</Text>
             <View style={styles.modalTxt}>
-            <Text style={styles.detailText}>Doctor: {params.doctorName}</Text>
-            <Text style={styles.detailText}>Specialty: {params.specialty}</Text>
-            <Text style={styles.detailText}>Date: {formatDate(params.date)}</Text>
-            <Text style={styles.detailText}>Time: {params.time}</Text>
-            <Text style={styles.detailText}>Fee: {params.fee}</Text>
+              <Text style={styles.detailText}>Doctor: {params.doctorName}</Text>
+              <Text style={styles.detailText}>Specialty: {params.specialty}</Text>
+              <Text style={styles.detailText}>Date: {formatDate(params.date)}</Text>
+              <Text style={styles.detailText}>Time: {params.time}</Text>
+              <Text style={styles.detailText}>Fee: {params.fee}</Text>
             </View>
             <TouchableOpacity style={styles.okButton} onPress={handleSuccessOk}>
               <Text style={styles.buttonText}>OK</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Calendar Modal */}
+      <Modal
+        visible={showCalendarModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCalendarCancel}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Add to Calendar?</Text>
+            <Text style={styles.modalText}>
+              Would you like to add this appointment to your calendar?
+            </Text>
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity style={styles.yesButton} onPress={addEventToCalendar}>
+                <Text style={styles.buttonText}>Yes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.noButton} onPress={handleCalendarCancel}>
+                <Text style={styles.buttonText}>No</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -189,8 +276,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f5f5",
-    paddingVertical: 25,
-    marginTop: 18,
+    marginTop: 30
   },
   scrollContainer: {
     padding: 20,
