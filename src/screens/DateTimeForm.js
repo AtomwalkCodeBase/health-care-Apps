@@ -10,8 +10,8 @@ const DateTimeForm = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const doctor = {
-    name: params.doctorName || "Dr. Kevon Lane",
-    specialty: params.designation || "Gynecologist",
+    name: params.name || "Dr. Kevon Lane",
+    specialty: params.specialty || "Gynecologist",
     experience: "05+ Years",
     rating: "4.9 (500)",
     fee: "₹500",
@@ -120,7 +120,7 @@ const DateTimeForm = () => {
           </View>
           <Text style={styles.doctorName}>{doctor.name}</Text>
           <Text style={styles.specialization}>{doctor.specialty}</Text>
-          <Text style={styles.education}>{doctor.education.join(" • ")}</Text>
+          {/* <Text style={styles.education}>{doctor.education.join(" • ")}</Text> */}
         </View>
 
         <View style={styles.statsRow}>

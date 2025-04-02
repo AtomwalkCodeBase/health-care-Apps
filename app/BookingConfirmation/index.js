@@ -47,7 +47,7 @@ const BookingConfirmation = () => {
 
   const handleSuccessOk = () => {
     setShowSuccessModal(false);
-    router.push("/home"); // Redirect to home.js
+    router.push("/book"); // Redirect to home.js
   };
 
   return (
