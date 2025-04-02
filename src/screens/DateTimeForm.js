@@ -10,8 +10,8 @@ const DateTimeForm = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const doctor = {
-    name: params.name || "Dr. Kevon Lane",
-    specialty: params.specialty || "Gynecologist",
+    name: params.doctorName || "Dr. Kevon Lane",
+    specialty: params.designation || "Gynecologist",
     experience: "05+ Years",
     rating: "4.9 (500)",
     fee: "₹500",
@@ -19,15 +19,18 @@ const DateTimeForm = () => {
     image: params.image || "https://via.placeholder.com/100",
   };
 
-  // Generate dates for the current week
-  const generateWeekDates = () => {
+  const appointmentId = params.appointmentId;
+  const initialDate = params.date;
+  const initialTime = params.time;
+
+  const generateWeekDates = (startDate) => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const today = new Date();
-    const currentDate = today.getDate();
-    const currentDay = today.getDay();
-    
+    const baseDate = startDate ? new Date(startDate) : new Date();
+    const currentDate = baseDate.getDate();
+    const currentDay = baseDate.getDay();
+
     return Array.from({ length: 7 }).map((_, i) => {
-      const date = new Date(today);
+      const date = new Date(baseDate);
       date.setDate(currentDate + (i - currentDay));
       const dayName = days[date.getDay()];
       const dayNum = date.getDate();
@@ -35,9 +38,11 @@ const DateTimeForm = () => {
     });
   };
 
-  const [dates, setDates] = useState(generateWeekDates());
-  const [selectedDate, setSelectedDate] = useState(generateWeekDates()[0]);
-  const [selectedTime, setSelectedTime] = useState(null);
+  const [dates, setDates] = useState(generateWeekDates(initialDate));
+  const [selectedDate, setSelectedDate] = useState(
+    initialDate ? `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(initialDate).getDay()]} ${new Date(initialDate).getDate()}` : generateWeekDates()[0]
+  );
+  const [selectedTime, setSelectedTime] = useState(initialTime || null);
   const [showCalendar, setShowCalendar] = useState(false);
 
   const timeSlots = [
@@ -70,7 +75,7 @@ const DateTimeForm = () => {
     const dayName = days[date.getDay()];
     const dayNum = date.getDate();
     const formattedDate = `${dayName} ${dayNum}`;
-    
+
     const newWeekDates = Array.from({ length: 7 }).map((_, i) => {
       const newDate = new Date(date);
       newDate.setDate(date.getDate() + (i - date.getDay()));
@@ -78,7 +83,7 @@ const DateTimeForm = () => {
       const newDayNum = newDate.getDate();
       return `${newDayName} ${newDayNum}`;
     });
-    
+
     setDates(newWeekDates);
     setSelectedDate(formattedDate);
     setShowCalendar(false);
@@ -90,13 +95,14 @@ const DateTimeForm = () => {
       router.push({
         pathname: "/BookingConfirmation",
         params: {
+          appointmentId: appointmentId || null,
           doctorName: doctor.name,
           specialty: doctor.specialty,
           image: doctor.image,
           date: selectedDate,
           time: `${slot.start} - ${slot.end}`,
-          fee: doctor.fee
-        }
+          fee: doctor.fee,
+        },
       });
     }
   };
@@ -104,8 +110,8 @@ const DateTimeForm = () => {
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
-      <Header title="Book an Appointment" />
-      
+      <Header title={appointmentId ? "Reschedule Appointment" : "Book an Appointment"} />
+
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.profileCard}>
           <View style={styles.profileImageContainer}>
@@ -139,17 +145,17 @@ const DateTimeForm = () => {
 
         <View style={styles.sectionHeaderContainer}>
           <Text style={styles.sectionHeader}>Select Date</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.calendarButton}
             onPress={() => setShowCalendar(true)}
           >
             <Icon name="calendar-today" size={20} color="#2a7fba" />
           </TouchableOpacity>
         </View>
-        
+
         <View style={styles.dateCard}>
-          <ScrollView 
-            horizontal 
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.datesContainer}
           >
@@ -159,19 +165,19 @@ const DateTimeForm = () => {
                 <TouchableOpacity
                   key={date}
                   style={[
-                    styles.dateButton, 
+                    styles.dateButton,
                     selectedDate === date && styles.selectedDate
                   ]}
                   onPress={() => setSelectedDate(date)}
                 >
                   <Text style={[
-                    styles.dayText,
+                      styles.dayText,
                     selectedDate === date && styles.selectedDateText
                   ]}>
                     {dayName}
                   </Text>
                   <Text style={[
-                    styles.dateNumText,
+                      styles.dateNumText,
                     selectedDate === date && styles.selectedDateText
                   ]}>
                     {dayNum}
@@ -191,20 +197,23 @@ const DateTimeForm = () => {
                 style={[
                   styles.timeSlot,
                   selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeSlot,
-                  slot.status === "Booked" && styles.bookedTimeSlot
+                  slot.status === "Booked" && styles.bookedTimeSlot,
                 ]}
                 onPress={() => handleTimeSelection(slot)}
                 disabled={slot.status === "Booked"}
               >
-                <Text style={[
-                  styles.timeRangeText,
-                  selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeText,
-                  slot.status === "Booked" && styles.bookedTimeText
-                ]}>
+                <Text
+                  style={[
+                    styles.timeRangeText,
+                    selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeText,
+                    slot.status === "Booked" && styles.bookedTimeText,
+                  ]}
+                >
                   {`${slot.start} - ${slot.end}`}
                 </Text>
-                <View style={[
-                  styles.statusBadge,
+                <View
+                  style={[
+                    styles.statusBadge,
                   slot.status === "Available" ? styles.availableBadge : styles.bookedBadge
                 ]}>
                   <Text style={styles.statusText}>
@@ -217,16 +226,18 @@ const DateTimeForm = () => {
         </View>
       </ScrollView>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[
           styles.bookButton,
-          !selectedTime && { backgroundColor: '#cccccc' }
+          !selectedTime && { backgroundColor: '#cccccc' },
         ]}
         disabled={!selectedTime}
         onPress={handleSubmit}
       >
         <View style={styles.buttonContent}>
-          <Text style={styles.bookButtonText}>Select Appointment</Text>
+          <Text style={styles.bookButtonText} disabled={!selectedTime}>
+            {appointmentId ? "Reschedule Appointment" : "Select Appointment"}
+          </Text>
           <Icon name="check-circle" size={20} color="white" />
         </View>
       </TouchableOpacity>
@@ -275,6 +286,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f5f5",
     paddingTop: 25,
+    marginTop: 20,
   },
   scrollContainer: {
     padding: 16,
@@ -516,54 +528,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginRight: 10,
-  },
-  modalContent: {
-    backgroundColor: "white",
-    padding: 20,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  modalIcon: {
-    marginBottom: 15,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#2c3e50",
-    marginBottom: 10,
-  },
-  modalText: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  okButton: {
-    backgroundColor: "#2a7fba",
-    paddingVertical: 10,
-    paddingHorizontal: 40,
-    borderRadius: 8,
-  },
-  okButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  calendarModal: {
-    justifyContent: 'flex-start',
-    marginTop: 60,
-    marginBottom: 0,
-    marginHorizontal: 20,
-  },
-  calendarContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 10,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   modalOverlay: {
     flex: 1,

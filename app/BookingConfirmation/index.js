@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
+import React, { useState } from "react";
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Modal } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Header from "../../src/components/Header";
@@ -8,20 +8,46 @@ import { StatusBar } from "expo-status-bar";
 const BookingConfirmation = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Format the date to show day, date and year
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    
+
+    // Assuming dateString is in "Day Num" format (e.g., "Mon 15")
+    const [dayAbbr, dayNum] = dateString.split(" ");
+    const dayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(dayAbbr);
     const date = new Date();
-    const dayName = days[date.getDay()];
-    const dateNum = date.getDate();
+    date.setDate(parseInt(dayNum));
+    date.setMonth(new Date().getMonth()); // Assuming current month for simplicity
+    date.setFullYear(new Date().getFullYear()); // Assuming current year
+
+    const dayName = days[dayIndex];
     const monthName = months[date.getMonth()];
     const year = date.getFullYear();
-    
-    return `${dayName}, ${dateNum} ${monthName} ${year}`;
+
+    return `${dayName}, ${dayNum} ${monthName} ${year}`;
+  };
+
+  const handleConfirmBooking = () => {
+    setShowConfirmModal(true); // Show confirmation modal
+  };
+
+  const handleConfirmYes = () => {
+    setShowConfirmModal(false);
+    setShowSuccessModal(true); // Show success modal
+  };
+
+  const handleConfirmNo = () => {
+    setShowConfirmModal(false);
+  };
+
+  const handleSuccessOk = () => {
+    setShowSuccessModal(false);
+    router.push("/home"); // Redirect to home.js
   };
 
   return (
@@ -98,11 +124,63 @@ const BookingConfirmation = () => {
       {/* Confirm Button */}
       <TouchableOpacity 
         style={styles.confirmButton}
-        onPress={() => router.push("/BookingSuccess")}
+        onPress={handleConfirmBooking} // Updated to trigger modal
       >
         <Text style={styles.confirmButtonText}>Confirm Booking</Text>
-        <Icon name="arrow-forward" size={20} color="white" style={styles.buttonIcon} />
+        <Icon name="check-circle" size={20} color="white" style={styles.buttonIcon} />
       </TouchableOpacity>
+
+      {/* Confirmation Modal */}
+      <Modal
+        visible={showConfirmModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleConfirmNo}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>
+              {params.appointmentId ? "Confirm Reschedule?" : "Confirm Booking?"}
+            </Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to {params.appointmentId ? "reschedule" : "book"} this appointment?
+            </Text>
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity style={styles.yesButton} onPress={handleConfirmYes}>
+                <Text style={styles.buttonText}>Yes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.noButton} onPress={handleConfirmNo}>
+                <Text style={styles.buttonText}>No</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleSuccessOk}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Icon name="check-circle" size={50} color="#4CAF50" style={styles.successIcon} />
+            <Text style={styles.modalTitle}>Appointment Booked</Text>
+            <View style={styles.modalTxt}>
+            <Text style={styles.detailText}>Doctor: {params.doctorName}</Text>
+            <Text style={styles.detailText}>Specialty: {params.specialty}</Text>
+            <Text style={styles.detailText}>Date: {formatDate(params.date)}</Text>
+            <Text style={styles.detailText}>Time: {params.time}</Text>
+            <Text style={styles.detailText}>Fee: {params.fee}</Text>
+            </View>
+            <TouchableOpacity style={styles.okButton} onPress={handleSuccessOk}>
+              <Text style={styles.buttonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -111,7 +189,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f5f5",
-    paddingVertical:25,
+    paddingVertical: 25,
+    marginTop: 18,
   },
   scrollContainer: {
     padding: 20,
@@ -263,6 +342,71 @@ const styles = StyleSheet.create({
   },
   buttonIcon: {
     marginLeft: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 20,
+    width: "90%",
+    maxWidth: 400,
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2c3e50",
+    marginBottom: 10,
+  },
+  modalTxt: {
+    textAlign: "left",
+  },
+  modalText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "left",
+    marginBottom: 20,
+  },
+  modalButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  yesButton: {
+    backgroundColor: "#2a7fba",
+    padding: 10,
+    borderRadius: 8,
+    flex: 1,
+    marginRight: 10,
+    alignItems: "center",
+  },
+  noButton: {
+    backgroundColor: "#F44336",
+    padding: 10,
+    borderRadius: 8,
+    flex: 1,
+    alignItems: "center",
+  },
+  okButton: {
+    backgroundColor: "#2a7fba",
+    padding: 12,
+    borderRadius: 8,
+    width: "100%",
+    alignItems: "center",
+    marginTop: 20,
+  },
+  buttonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  successIcon: {
+    marginBottom: 20,
   },
 });
 

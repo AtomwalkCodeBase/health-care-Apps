@@ -77,14 +77,14 @@ const DoctorProfile = () => {
           {/* About Section with Mapped Data */}
           <View style={styles.aboutContainer}>
             <Text style={styles.sectionTitle}>About</Text>
-            <Text style={styles.aboutText}>
-              Dr. Thomas Michael is a highly experienced cardiologist with{" "}
+            <Text style={styles.aboutText}> 
+              {item.name} is a highly experienced cardiologist with{" "}
               <Text style={styles.highlight}>{experience}</Text> of expertise in
               diagnosing and treating heart-related conditions. He has attended
               to over <Text style={styles.highlight}>{patients}</Text>{" "}
               patients, achieving an impressive{" "}
               <Text style={styles.highlight}>{successRate}</Text> success rate.
-              His exceptional skills are reflected in his{" "}
+              His exceptional skills are reflected in his{" ⭐"}
               <Text style={styles.highlight}>{rating}</Text> rating, making him
               a trusted specialist in managing hypertension, heart disease, and
               related problems.
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   headerContainer: {
-    marginTop: 45,
+    marginTop: 43,
   },
   contentContainer: {
     padding: 16,

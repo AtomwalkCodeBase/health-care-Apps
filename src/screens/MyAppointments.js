@@ -192,36 +192,67 @@ export default function MyAppointments() {
   const [isModalVisible, setModalVisible] = useState(false);
   const [data, setData] = useState('');
   const [cancelclick, setCancelclick] = useState(false);
+  const [rescheduleClick, setRescheduleClick] = useState(false); // New state for reschedule modal
   const { appointments, moveToPast, moveToCancelled } = useAppointments();
 
   const movetocancel = () => {
     moveToCancelled(data);
     setModalVisible(false);
+    setCancelclick(false);
     setActiveTab('cancelled');
   };
 
   const onpressyes = () => {
-    moveToPast(data);
-    setModalVisible(false);
-    setActiveTab('past');
+    if (rescheduleClick) {
+      // Handle reschedule confirmation
+      const appointment = appointments.upcoming.find(a => a.id === data);
+      if (appointment) {
+        router.push({
+          pathname: "/DateTime",
+          params: {
+            appointmentId: appointment.id,
+            doctorName: appointment.doctorName,
+            designation: appointment.designation,
+            date: appointment.date,
+            time: appointment.time,
+            image: appointment.image.uri,
+          },
+        });
+      }
+      setModalVisible(false);
+      setRescheduleClick(false);
+    } else {
+      // Handle complete confirmation
+      moveToPast(data);
+      setModalVisible(false);
+      setActiveTab('past');
+    }
   };
 
   const onpresno = () => {
     setModalVisible(false);
+    setCancelclick(false);
+    setRescheduleClick(false);
   };
 
   const handleComplete = (appointmentId) => {
     setModalVisible(true);
     setData(appointmentId);
+    setCancelclick(false);
+    setRescheduleClick(false);
   };
 
   const handleUpdate = (appointmentId) => {
-    router.push(`/appointments/${appointmentId}/update`);
+    setModalVisible(true);
+    setData(appointmentId);
+    setCancelclick(false);
+    setRescheduleClick(true); // Trigger reschedule modal
   };
 
   const handleCancel = (appointmentId) => {
     setModalVisible(true);
     setCancelclick(true);
+    setRescheduleClick(false);
     setData(appointmentId);
   };
 
@@ -287,6 +318,7 @@ export default function MyAppointments() {
         onpresno={onpresno}
         cancelclick={cancelclick}
         movetocancel={movetocancel}
+        rescheduleClick={rescheduleClick} // Pass reschedule state to modal
       />
     </View>
   );
@@ -297,6 +329,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+    marginTop: 43
   },
   tabContainer: {
     flexDirection: 'row',
@@ -359,7 +392,7 @@ const styles = StyleSheet.create({
   cardContent: {
     flexDirection: 'row',
     marginBottom: 12,
-    alignItems: 'center', // Align items vertically for better balance with larger image
+    alignItems: 'center',
   },
   imageContainer: {
     shadowColor: '#000',
@@ -368,9 +401,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   doctorImage: {
-    width: 90, // Increased from 70 to 90 for a more prominent look
-    height: 90, // Increased from 70 to 90
-    borderRadius: 15, // Slightly increased border radius for a softer look
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     marginRight: 16,
     borderWidth: 2,
     borderColor: COLORS.light,
@@ -393,12 +426,12 @@ const styles = StyleSheet.create({
   timeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6, // Slightly increased spacing between date and time
+    marginBottom: 6,
   },
   dateTime: {
-    fontSize: 16, // Increased from 14 to 16 for better readability
+    fontSize: 16,
     color: COLORS.dark,
-    marginLeft: 6, // Added a small margin for better spacing with the icon
+    marginLeft: 6,
   },
   statusBadge: {
     alignSelf: 'flex-start',
@@ -416,12 +449,6 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  cancelledBadgeText: {
-    color: COLORS.danger,
-  },
-  completedBadgeText: {
-    color: COLORS.primary,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -483,3 +510,4 @@ const styles = StyleSheet.create({
     maxWidth: '70%',
   },
 });
+
