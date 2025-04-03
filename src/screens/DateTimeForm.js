@@ -5,12 +5,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import Header from "../components/Header";
 import { StatusBar } from "expo-status-bar";
 import { Calendar } from 'react-native-calendars';
-
+import AsyncStorage from "@react-native-async-storage/async-storage";
 const DateTimeForm = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const doctor = {
-    name: params.name || "Dr. Kevon Lane",
+    name: params.name || params.doctorName ,
     specialty: params.specialty || "Gynecologist",
     experience: "05+ Years",
     rating: "4.9 (500)",
@@ -40,7 +40,7 @@ const DateTimeForm = () => {
 
   const [dates, setDates] = useState(generateWeekDates(initialDate));
   const [selectedDate, setSelectedDate] = useState(
-    initialDate ? `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(initialDate).getDay()]} ${new Date(initialDate).getDate()}` : generateWeekDates()[0]
+    initialDate || generateWeekDates()[0]
   );
   const [selectedTime, setSelectedTime] = useState(initialTime || null);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -89,12 +89,10 @@ const DateTimeForm = () => {
     setShowCalendar(false);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async() => {
     if (selectedTime) {
       const slot = timeSlots.find(s => s.start === selectedTime);
-      router.push({
-        pathname: "/BookingConfirmation",
-        params: {
+        const bookingData =  {
           appointmentId: appointmentId || null,
           doctorName: doctor.name,
           specialty: doctor.specialty,
@@ -102,7 +100,10 @@ const DateTimeForm = () => {
           date: selectedDate,
           time: `${slot.start} - ${slot.end}`,
           fee: doctor.fee,
-        },
+        };
+        router.push({
+          pathname:"/BookingConfirmation",
+          params:bookingData,
       });
     }
   };

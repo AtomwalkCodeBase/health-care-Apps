@@ -14,7 +14,7 @@ const BookingConfirmation = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
 
-  // Format the date to show day, date, and year
+  // Format date to "Friday, 04 April 2025" for display and storage
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -27,26 +27,24 @@ const BookingConfirmation = () => {
     date.setMonth(new Date().getMonth());
     date.setFullYear(new Date().getFullYear());
 
-    return `${days[dayIndex]}, ${dayNum} ${months[date.getMonth()]} ${date.getFullYear()}`;
+    const formattedDay = String(dayNum).padStart(2, '0');
+    return `${days[dayIndex]}, ${formattedDay} ${months[date.getMonth()]} ${date.getFullYear()}`;
   };
 
-  // Parse date and time for calendar event
-  const parseDateTime = (dateString, timeString) => {
-    const [dayAbbr, dayNum] = dateString.split(" ");
+  // Parse the formatted date and time for calendar event
+  const parseDateTime = (formattedDate, timeString) => {
+    const [dayName, dayMonthYear] = formattedDate.split(', ');
+    const [dayNum, monthName, year] = dayMonthYear.split(' ');
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthIndex = months.indexOf(monthName);
+
     const [time, period] = timeString.split(" ");
     let [hours, minutes] = time.split(":");
     hours = parseInt(hours);
     if (period === "PM" && hours !== 12) hours += 12;
     if (period === "AM" && hours === 12) hours = 0;
 
-    const date = new Date();
-    date.setDate(parseInt(dayNum));
-    date.setMonth(new Date().getMonth());
-    date.setFullYear(new Date().getFullYear());
-    date.setHours(hours);
-    date.setMinutes(parseInt(minutes));
-    date.setSeconds(0);
-
+    const date = new Date(year, monthIndex, parseInt(dayNum), hours, parseInt(minutes), 0);
     return date;
   };
 
@@ -67,7 +65,7 @@ const BookingConfirmation = () => {
         return;
       }
 
-      const startDate = parseDateTime(params.date, params.time);
+      const startDate = parseDateTime(formatDate(params.date), params.time);
       const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
 
       const eventDetails = {
@@ -93,10 +91,10 @@ const BookingConfirmation = () => {
   const storeBooking = async () => {
     try {
       const booking = {
-        id: Date.now().toString(), // Unique ID based on timestamp
+        id: Date.now().toString(),
         doctorName: params.doctorName,
         specialty: params.specialty,
-        date: params.date,
+        date: formatDate(params.date), // Store as "Friday, 04 April 2025"
         time: params.time,
         fee: params.fee,
         image: params.image,
@@ -104,16 +102,18 @@ const BookingConfirmation = () => {
         bookingDate: new Date().toISOString()
       };
 
-      // Get existing bookings or initialize empty array
       const existingBookings = await AsyncStorage.getItem('bookings');
-      const bookings = existingBookings ? JSON.parse(existingBookings) : [];
-      
-      // Add new booking
-      bookings.push(booking);
-      
-      // Save updated bookings
+      let bookings = existingBookings ? JSON.parse(existingBookings) : [];
+      if (params.appointmentId) {
+        bookings = bookings.map(b =>
+          b.id === params.appointmentId ? { ...b, date: params.date, time: params.time } : b);
+      }
+      else {
+        bookings.push(booking);
+      }
+
       await AsyncStorage.setItem('bookings', JSON.stringify(bookings));
-      
+
       return true;
     } catch (error) {
       console.error('Error storing booking:', error);
@@ -142,7 +142,6 @@ const BookingConfirmation = () => {
   const handleSuccessOk = () => {
     setShowSuccessModal(false);
     setShowCalendarModal(false);
-    // Navigate to MyAppointments with upcoming tab selected
     router.push({
       pathname: "/book",
       params: { tab: 'upcoming' }
@@ -156,7 +155,6 @@ const BookingConfirmation = () => {
 
   const handleViewMyBook = () => {
     setShowSuccessModal(false);
-    // Navigate to MyAppointments with upcoming tab selected
     router.push({
       pathname: "/book",
       params: { tab: 'upcoming' }
@@ -273,9 +271,9 @@ const BookingConfirmation = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Icon name="check-circle" size={50} color="#4CAF50" style={styles.successIcon} />
-            <Text style={styles.modalTitle}>Appointment Booked</Text>
+            <Text style={styles.modalTitle}>Appointment {params.appointmentId ? "Rescheduled":"Booked"}</Text>
             <View style={styles.modalTxt}>
-              <Text style={styles.detailText}>Doctor: {params.doctorName}</Text>
+              <Text style={styles.detailText}>Doctor: {params.name}</Text>
               <Text style={styles.detailText}>Specialty: {params.specialty}</Text>
               <Text style={styles.detailText}>Date: {formatDate(params.date)}</Text>
               <Text style={styles.detailText}>Time: {params.time}</Text>
@@ -323,6 +321,7 @@ const BookingConfirmation = () => {
   );
 };
 
+// Styles remain unchanged
 const styles = StyleSheet.create({
   container: {
     flex: 1,

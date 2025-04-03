@@ -49,26 +49,76 @@ const notifyListeners = () => {
   listeners.forEach(callback => callback(appointmentsState));
 };
 
-const parseDateTime = (dateString, timeString) => {
-  const [dayAbbr, dayNum] = dateString.split(' ');
-  const [time, period] = timeString.split(' ');
-  let [hours, minutes] = time.split(':');
-  hours = parseInt(hours);
-  if (period === 'PM' && hours !== 12) hours += 12;
-  if (period === 'AM' && hours === 12) hours = 0;
+const formatDate = (dateString) => {
+  if (!dateString) return "";
+  
+  // If the date is already in the full format (from BookingConfirmation), return as is
+  if (dateString.includes(',')) return dateString;
 
+  // Handle the "Fri 4" format
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const [dayAbbr, dayNum] = dateString.split(' ');
+  const dayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(dayAbbr);
   const date = new Date();
   date.setDate(parseInt(dayNum));
   date.setMonth(new Date().getMonth());
   date.setFullYear(new Date().getFullYear());
-  date.setHours(hours);
-  date.setMinutes(parseInt(minutes));
-  date.setSeconds(0);
 
+  const formattedDay = String(dayNum).padStart(2, '0');
+  return `${days[dayIndex]}, ${formattedDay} ${months[date.getMonth()]} ${date.getFullYear()}`;
+};
+
+const parseDateTime = (dateString, timeString) => {
+  console.log('Parsing dateString:', dateString, 'timeString:', timeString);
+  
+  // Handle both "Fri 4" and "Friday, 04 April 2025" formats
+  let dayNum, monthIndex, year;
+  
+  if (dateString.includes(',')) {
+    // Handle "Friday, 04 April 2025" format
+    const [_, dayMonthYear] = dateString.split(', ');
+    const [day, month, yr] = dayMonthYear.split(' ');
+    dayNum = parseInt(day);
+    monthIndex = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
+                 'August', 'September', 'October', 'November', 'December'].indexOf(month);
+    year = parseInt(yr);
+  } else {
+    // Handle "Fri 4" format
+    const [dayAbbr, day] = dateString.split(' ');
+    dayNum = parseInt(day);
+    monthIndex = new Date().getMonth();
+    year = new Date().getFullYear();
+  }
+
+  const [time, period] = timeString.split(' ');
+  if (!time || !period) {
+    console.error('Invalid time or period:', time, period);
+    return null;
+  }
+
+  let [hours, minutes] = time.split(':').map(Number);
+  if (isNaN(hours) || isNaN(minutes)) {
+    console.error('Invalid hours or minutes:', hours, minutes);
+    return null;
+  }
+
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+
+  const date = new Date(year, monthIndex, dayNum, hours, minutes, 0);
+
+  if (isNaN(date.getTime())) {
+    console.error('Invalid Date object created:', date);
+    return null;
+  }
+
+  console.log('Parsed date:', date.toISOString());
   return date;
 };
 
-const AppointmentCard = ({ appointment, onComplete, onUpdate, onDelete, isCancelled, isPast, onAddToCalendar }) => {
+const AppointmentCard = ({ appointment, onUpdate, onDelete, isCancelled, isPast, onAddToCalendar }) => {
   return (
     <View style={[
       styles.card,
@@ -81,25 +131,15 @@ const AppointmentCard = ({ appointment, onComplete, onUpdate, onDelete, isCancel
         </View>
         <View style={styles.infoContainer}>
           <Text style={styles.doctorName}>{appointment.doctorName}</Text>
-          {!isCancelled && !isPast && (
-            <TouchableOpacity 
-              style={styles.calendarButton}
-              onPress={() => onAddToCalendar(appointment)}
-            >
-              <Text style={styles.calendarButtonText}>Add to Calendar</Text>
-            </TouchableOpacity>
-          )}
           <Text style={styles.specialty}>{appointment.specialty}</Text>
-          
           <View style={styles.timeContainer}>
             <Ionicons name="calendar-outline" size={16} color={COLORS.muted} />
-            <Text style={styles.dateTime}> {appointment.date}</Text>
+            <Text style={styles.dateTime}> {formatDate(appointment.date)}</Text>
           </View>
           <View style={styles.timeContainer}>
             <Ionicons name="time-outline" size={16} color={COLORS.muted} />
             <Text style={styles.dateTime}> {appointment.time}</Text>
           </View>
-          
           {isCancelled && (
             <View style={[styles.statusBadge, styles.cancelledBadge]}>
               <Text style={styles.statusBadgeText}>Cancelled</Text>
@@ -115,11 +155,11 @@ const AppointmentCard = ({ appointment, onComplete, onUpdate, onDelete, isCancel
       {!isCancelled && !isPast && (
         <View style={styles.buttonContainer}>
           <TouchableOpacity 
-            style={[styles.button, styles.completeButton]} 
-            onPress={onComplete}
+            style={[styles.button, styles.calendarButtonStyle]} 
+            onPress={() => onAddToCalendar(appointment)}
           >
-            <Ionicons name="checkmark-circle" size={18} color={COLORS.white} />
-            <Text style={styles.buttonText}> Complete</Text>
+            <Ionicons name="calendar" size={18} color={COLORS.white} />
+            <Text style={styles.buttonText}> Calendar</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.button, styles.updateButton]} 
@@ -200,25 +240,6 @@ export const useAppointments = () => {
     }
   };
 
-  const moveToPast = (appointmentId) => {
-    const appointmentToComplete = appointmentsState.upcoming.find(a => a.id === appointmentId);
-    if (!appointmentToComplete) return;
-
-    const updatedAppointments = {
-      ...appointmentsState,
-      upcoming: appointmentsState.upcoming.filter(a => a.id !== appointmentId),
-      past: [...appointmentsState.past, {
-        ...appointmentToComplete,
-        status: 'past',
-        completionDate: new Date().toISOString()
-      }]
-    };
-    appointmentsState = updatedAppointments;
-    setAppointments(updatedAppointments);
-    saveAppointmentsToStorage(updatedAppointments);
-    notifyListeners();
-  };
-
   const moveToCancelled = (appointmentId) => {
     const appointmentToCancel = appointmentsState.upcoming.find(a => a.id === appointmentId);
     if (!appointmentToCancel) return;
@@ -238,7 +259,7 @@ export const useAppointments = () => {
     notifyListeners();
   };
 
-  return { appointments, setAppointments, moveToPast, moveToCancelled, loadStoredAppointments };
+  return { appointments, setAppointments, moveToCancelled, loadStoredAppointments };
 };
 
 export default function MyAppointments() {
@@ -250,12 +271,12 @@ export default function MyAppointments() {
   const [rescheduleClick, setRescheduleClick] = useState(false);
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
   const [calendarError, setCalendarError] = useState(null);
-  const { appointments, moveToPast, moveToCancelled, loadStoredAppointments } = useAppointments();
+  const { appointments, moveToCancelled, loadStoredAppointments } = useAppointments();
   const router = useRouter();
 
   useEffect(() => {
     loadStoredAppointments();
-    setActiveTab(tab); // Update active tab when navigation params change
+    setActiveTab(tab);
   }, [tab]);
 
   const movetocancel = () => {
@@ -282,22 +303,11 @@ export default function MyAppointments() {
       }
       setModalVisible(false);
       setRescheduleClick(false);
-    } else {
-      moveToPast(data);
-      setModalVisible(false);
-      setActiveTab('past');
     }
   };
 
   const onpresno = () => {
     setModalVisible(false);
-    setCancelclick(false);
-    setRescheduleClick(false);
-  };
-
-  const handleComplete = (appointmentId) => {
-    setModalVisible(true);
-    setData(appointmentId);
     setCancelclick(false);
     setRescheduleClick(false);
   };
@@ -335,7 +345,14 @@ export default function MyAppointments() {
       }
 
       const startDate = parseDateTime(appointment.date, appointment.time);
+      if (!startDate) {
+        setCalendarError('Invalid date or time format');
+        setCalendarModalVisible(true);
+        return;
+      }
+
       const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+      console.log('Start Date:', startDate.toISOString(), 'End Date:', endDate.toISOString());
 
       const eventDetails = {
         title: `Appointment with ${appointment.doctorName}`,
@@ -387,7 +404,6 @@ export default function MyAppointments() {
             <AppointmentCard
               key={appointment.id}
               appointment={appointment}
-              onComplete={() => handleComplete(appointment.id)}
               onUpdate={() => handleUpdate(appointment.id)}
               onDelete={() => handleCancel(appointment.id)}
               onAddToCalendar={handleAddToCalendar}
@@ -594,7 +610,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     flexDirection: 'row',
   },
-  completeButton: {
+  calendarButtonStyle: {
     backgroundColor: COLORS.success,
   },
   updateButton: {
@@ -608,17 +624,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontSize: 14,
     marginLeft: 4,
-  },
-  calendarButton: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    padding: 8,
-  },
-  calendarButtonText: {
-    color: COLORS.primary,
-    fontSize: 12,
-    fontWeight: '500',
   },
   emptyContainer: {
     flex: 1,
