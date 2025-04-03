@@ -104,23 +104,29 @@ const BookingConfirmation = () => {
 
   const handleSuccessOk = () => {
     setShowSuccessModal(false);
-    setShowCalendarModal(true);
+    setShowCalendarModal(false);
+    router.push("/home");
   };
 
   const handleCalendarCancel = () => {
     setShowCalendarModal(false);
-    router.push("/home");
+    router.push("/book");
+  };
+
+  const handleViewMyBook = () => {
+    setShowSuccessModal(false);
+    router.push("/book");
   };
 
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
-      <Header 
-        title="Confirm Booking" 
-        showBackButton 
-        onBackPress={() => router.back()} 
+      <Header
+        title="Confirm Booking"
+        showBackButton
+        onBackPress={() => router.back()}
       />
-      
+
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Doctor Information Card */}
         <View style={styles.card}>
@@ -184,7 +190,7 @@ const BookingConfirmation = () => {
       </ScrollView>
 
       {/* Confirm Button */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.confirmButton}
         onPress={handleConfirmBooking}
       >
@@ -237,9 +243,17 @@ const BookingConfirmation = () => {
               <Text style={styles.detailText}>Time: {params.time}</Text>
               <Text style={styles.detailText}>Fee: {params.fee}</Text>
             </View>
-            <TouchableOpacity style={styles.okButton} onPress={handleSuccessOk}>
-              <Text style={styles.buttonText}>OK</Text>
-            </TouchableOpacity>
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity
+                style={[styles.okButton, { flex: 1, backgroundColor: "#2a7fba", marginRight: 10 }]}
+                onPress={handleViewMyBook}
+              >
+                <Text style={styles.buttonText}>View My Bookings</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.okButton, { flex: 1, }]} onPress={handleSuccessOk}>
+                <Text style={styles.buttonTextOk}>OK</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -485,6 +499,12 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     marginTop: 20,
+  },
+  buttonTextOk: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+    padding: 12
   },
   buttonText: {
     color: "white",
