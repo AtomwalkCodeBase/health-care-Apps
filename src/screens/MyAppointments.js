@@ -26,10 +26,10 @@ export const initialAppointmentsData = {
     {
       id: '3',
       doctorName: 'Dr. Robert Williams',
-      designation: 'Dermatologist',
+      specialty: 'Dermatologist',
       date: '2023-05-10',
       time: '11:00 AM',
-      image: { uri: "https://randomuser.me/api/portraits/men/2.jpg" },
+      image: "https://randomuser.me/api/portraits/men/2.jpg",
     }
   ],
   cancelled: []
@@ -50,7 +50,7 @@ const notifyListeners = () => {
 };
 
 const parseDateTime = (dateString, timeString) => {
-  const [year, month, day] = dateString.split('-');
+  const [dayAbbr, dayNum] = dateString.split(' ');
   const [time, period] = timeString.split(' ');
   let [hours, minutes] = time.split(':');
   hours = parseInt(hours);
@@ -58,9 +58,9 @@ const parseDateTime = (dateString, timeString) => {
   if (period === 'AM' && hours === 12) hours = 0;
 
   const date = new Date();
-  date.setFullYear(parseInt(year));
-  date.setMonth(parseInt(month) - 1);
-  date.setDate(parseInt(day));
+  date.setDate(parseInt(dayNum));
+  date.setMonth(new Date().getMonth());
+  date.setFullYear(new Date().getFullYear());
   date.setHours(hours);
   date.setMinutes(parseInt(minutes));
   date.setSeconds(0);
@@ -77,7 +77,7 @@ const AppointmentCard = ({ appointment, onComplete, onUpdate, onDelete, isCancel
     ]}>
       <View style={styles.cardContent}>
         <View style={styles.imageContainer}>
-          <Image source={appointment.image} style={styles.doctorImage} />
+          <Image source={{ uri: appointment.image }} style={styles.doctorImage} />
         </View>
         <View style={styles.infoContainer}>
           <Text style={styles.doctorName}>{appointment.doctorName}</Text>
@@ -89,7 +89,7 @@ const AppointmentCard = ({ appointment, onComplete, onUpdate, onDelete, isCancel
               <Text style={styles.calendarButtonText}>Add to Calendar</Text>
             </TouchableOpacity>
           )}
-          <Text style={styles.designation}>{appointment.designation}</Text>
+          <Text style={styles.specialty}>{appointment.specialty}</Text>
           
           <View style={styles.timeContainer}>
             <Ionicons name="calendar-outline" size={16} color={COLORS.muted} />
@@ -159,112 +159,45 @@ export const useAppointments = () => {
 
   const loadStoredAppointments = async () => {
     try {
-      const storedAppointments = await AsyncStorage.getItem('appointments');
-      console.log('Raw stored appointments:', storedAppointments);
-      
-      if (storedAppointments) {
-        const parsedAppointments = JSON.parse(storedAppointments);
-        console.log('Parsed appointments:', parsedAppointments);
+      const storedBookings = await AsyncStorage.getItem('bookings');
+      if (storedBookings) {
+        const parsedBookings = JSON.parse(storedBookings);
         
-        if (!Array.isArray(parsedAppointments)) {
-          console.error('Stored appointments is not an array, resetting to empty array');
-          await AsyncStorage.setItem('appointments', JSON.stringify([]));
-          return;
-        }
-
-        const formattedAppointments = parsedAppointments.map((apt, index) => {
-          try {
-            return {
-              id: apt.appointmentId || `fallback-${Date.now()}-${index}`,
-              doctorName: apt.doctorName || 'Unknown Doctor',
-              designation: apt.specialty || 'Unknown Specialty',
-              date: apt.date.includes('-') ? apt.date : formatDate(apt.date || 'Wed 1'),
-              time: apt.time ? (apt.time.includes('-') ? apt.time.split(' - ')[0] : apt.time) : 'Unknown Time',
-              image: { uri: apt.image || 'https://via.placeholder.com/100' },
-              status: apt.status || 'Confirmed',
-              cancellationDate: apt.cancellationDate || null
-            };
-          } catch (error) {
-            console.error('Error formatting appointment:', apt, error);
-            return null;
-          }
-        }).filter(apt => apt !== null);
-
         const updatedAppointments = {
-          upcoming: formattedAppointments.filter(apt => apt.status === 'Confirmed'),
+          upcoming: parsedBookings.filter(b => b.status === 'upcoming'),
           past: appointments.past,
-          cancelled: formattedAppointments.filter(apt => apt.status === 'Cancelled')
+          cancelled: parsedBookings.filter(b => b.status === 'cancelled')
         };
+        
         appointmentsState = updatedAppointments;
         setAppointments(updatedAppointments);
-        console.log('Loaded appointments into state:', updatedAppointments);
         notifyListeners();
-      } else {
-        console.log('No stored appointments found, using initial state');
       }
     } catch (error) {
-      console.error('Detailed error loading stored appointments:', error.message, error.stack);
+      console.error('Error loading stored appointments:', error);
     }
   };
 
   const saveAppointmentsToStorage = async (updatedAppointments) => {
     try {
-      const allAppointments = [
+      const allBookings = [
         ...updatedAppointments.upcoming.map(apt => ({
-          appointmentId: apt.id,
-          doctorName: apt.doctorName,
-          specialty: apt.designation,
-          date: apt.date,
-          time: apt.time,
-          image: apt.image.uri,
-          status: 'Confirmed'
+          ...apt,
+          status: 'upcoming'
         })),
         ...updatedAppointments.cancelled.map(apt => ({
-          appointmentId: apt.id,
-          doctorName: apt.doctorName,
-          specialty: apt.designation,
-          date: apt.date,
-          time: apt.time,
-          image: apt.image.uri,
-          status: 'Cancelled',
-          cancellationDate: apt.cancellationDate
+          ...apt,
+          status: 'cancelled'
+        })),
+        ...updatedAppointments.past.map(apt => ({
+          ...apt,
+          status: 'past'
         }))
       ];
-      await AsyncStorage.setItem('appointments', JSON.stringify(allAppointments));
-      console.log('Saved appointments to AsyncStorage:', allAppointments);
+      await AsyncStorage.setItem('bookings', JSON.stringify(allBookings));
     } catch (error) {
       console.error('Error saving appointments to storage:', error);
     }
-  };
-
-  const formatDate = (dateStr) => {
-    const [dayName, dayNum] = dateStr.split(' ');
-    const currentYear = new Date().getFullYear();
-    const month = new Date().getMonth() + 1;
-    const formattedDay = dayNum.padStart(2, '0');
-    const formattedMonth = month.toString().padStart(2, '0');
-    return `${currentYear}-${formattedMonth}-${formattedDay}`;
-  };
-
-  const addNewAppointment = (newAppointment) => {
-    const formattedAppointment = {
-      id: newAppointment.appointmentId || Date.now().toString(),
-      doctorName: newAppointment.doctorName || 'Unknown Doctor',
-      designation: newAppointment.specialty || 'Unknown Specialty',
-      date: formatDate(newAppointment.date),
-      time: newAppointment.time.split(' - ')[0],
-      image: { uri: newAppointment.image || 'https://via.placeholder.com/100' },
-      status: 'Confirmed'
-    };
-    const updatedAppointments = {
-      ...appointments,
-      upcoming: [...appointments.upcoming.filter(a => a.id !== formattedAppointment.id), formattedAppointment]
-    };
-    appointmentsState = updatedAppointments;
-    setAppointments(updatedAppointments);
-    saveAppointmentsToStorage(updatedAppointments);
-    console.log('Added new appointment:', formattedAppointment);
-    notifyListeners();
   };
 
   const moveToPast = (appointmentId) => {
@@ -276,7 +209,8 @@ export const useAppointments = () => {
       upcoming: appointmentsState.upcoming.filter(a => a.id !== appointmentId),
       past: [...appointmentsState.past, {
         ...appointmentToComplete,
-        completionDate: new Date().toISOString().split('T')[0]
+        status: 'past',
+        completionDate: new Date().toISOString()
       }]
     };
     appointmentsState = updatedAppointments;
@@ -294,8 +228,8 @@ export const useAppointments = () => {
       upcoming: appointmentsState.upcoming.filter(a => a.id !== appointmentId),
       cancelled: [...appointmentsState.cancelled, {
         ...appointmentToCancel,
-        status: 'Cancelled',
-        cancellationDate: new Date().toISOString().split('T')[0]
+        status: 'cancelled',
+        cancellationDate: new Date().toISOString()
       }]
     };
     appointmentsState = updatedAppointments;
@@ -304,37 +238,25 @@ export const useAppointments = () => {
     notifyListeners();
   };
 
-  return { appointments, setAppointments, moveToPast, moveToCancelled, addNewAppointment, loadStoredAppointments };
+  return { appointments, setAppointments, moveToPast, moveToCancelled, loadStoredAppointments };
 };
 
 export default function MyAppointments() {
-  const [activeTab, setActiveTab] = useState('upcoming');
+  const { tab = 'upcoming' } = useLocalSearchParams();
+  const [activeTab, setActiveTab] = useState(tab);
   const [isModalVisible, setModalVisible] = useState(false);
   const [data, setData] = useState('');
   const [cancelclick, setCancelclick] = useState(false);
   const [rescheduleClick, setRescheduleClick] = useState(false);
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
   const [calendarError, setCalendarError] = useState(null);
-  const { appointments, moveToPast, moveToCancelled, addNewAppointment, loadStoredAppointments } = useAppointments();
+  const { appointments, moveToPast, moveToCancelled, loadStoredAppointments } = useAppointments();
   const router = useRouter();
-  const params = useLocalSearchParams();
 
   useEffect(() => {
     loadStoredAppointments();
-  }, []);
-
-  useEffect(() => {
-    if (params.newAppointment) {
-      try {
-        const newAppointment = JSON.parse(params.newAppointment);
-        console.log('New appointment from params:', newAppointment);
-        addNewAppointment(newAppointment);
-        router.setParams({ newAppointment: null });
-      } catch (error) {
-        console.error("Error parsing newAppointment:", error);
-      }
-    }
-  }, [params.newAppointment]);
+    setActiveTab(tab); // Update active tab when navigation params change
+  }, [tab]);
 
   const movetocancel = () => {
     moveToCancelled(data);
@@ -347,25 +269,16 @@ export default function MyAppointments() {
     if (rescheduleClick) {
       const appointment = appointments.upcoming.find(a => a.id === data);
       if (appointment) {
-        console.log('Navigating to DateTimeForm for reschedule with params:', {
-          appointmentId: appointment.id,
-          doctorName: appointment.doctorName,
-          designation: appointment.designation,
-          image: appointment.image.uri,
-          isReschedule: true,
-        });
         router.push({
-          pathname: "/DateTimeForm",
+          pathname: "/DateTime",
           params: {
             appointmentId: appointment.id,
             doctorName: appointment.doctorName,
-            designation: appointment.designation,
-            image: appointment.image.uri,
+            specialty: appointment.specialty,
+            image: appointment.image,
             isReschedule: true,
           },
         });
-      } else {
-        console.error('Appointment not found for reschedule:', data);
       }
       setModalVisible(false);
       setRescheduleClick(false);
@@ -429,7 +342,7 @@ export default function MyAppointments() {
         startDate,
         endDate,
         location: 'Clinic',
-        notes: `Specialty: ${appointment.designation}`,
+        notes: `Specialty: ${appointment.specialty}`,
         calendarId: writableCalendar.id,
       };
 
@@ -634,7 +547,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     color: COLORS.dark,
   },
-  designation: {
+  specialty: {
     fontSize: 14,
     color: COLORS.muted,
     marginBottom: 8,

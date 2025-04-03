@@ -125,10 +125,10 @@ const HomeScreen = () => {
 
   const AppointmentCard = ({ item }) => (
     <TouchableOpacity style={styles.appointmentCard}>
-      <Image source={item.image} style={styles.appointmentImage} />
+      <Image source={{uri:item.image}} style={styles.appointmentImage} />
       <View style={styles.appointmentInfo}>
         <Text style={styles.appointmentDoctorName}>{item.doctorName}</Text>
-        <Text style={styles.appointmentDesignation}>{item.designation}</Text>
+        <Text style={styles.appointmentDesignation}>{item.specialty}</Text>
         <Text style={styles.appointmentDateTime}>
           {item.date} at {item.time}
         </Text>

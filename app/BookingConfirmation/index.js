@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import Header from "../../src/components/Header";
 import { StatusBar } from "expo-status-bar";
 import * as Calendar from 'expo-calendar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BookingConfirmation = () => {
   const router = useRouter();
@@ -58,7 +59,6 @@ const BookingConfirmation = () => {
         return;
       }
 
-      // Fetch all calendars and find a writable one
       const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
       const writableCalendar = calendars.find(cal => cal.allowsModifications) || calendars[0];
 
@@ -68,7 +68,7 @@ const BookingConfirmation = () => {
       }
 
       const startDate = parseDateTime(params.date, params.time);
-      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1-hour duration
+      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
 
       const eventDetails = {
         title: `Appointment with ${params.doctorName}`,
@@ -79,7 +79,7 @@ const BookingConfirmation = () => {
         calendarId: writableCalendar.id,
       };
 
-      const eventId = await Calendar.createEventAsync(writableCalendar.id, eventDetails);
+      await Calendar.createEventAsync(writableCalendar.id, eventDetails);
       alert('Event added to calendar successfully!');
       setShowCalendarModal(false);
       router.push("/home");
@@ -89,13 +89,50 @@ const BookingConfirmation = () => {
     }
   };
 
+  // Store booking details
+  const storeBooking = async () => {
+    try {
+      const booking = {
+        id: Date.now().toString(), // Unique ID based on timestamp
+        doctorName: params.doctorName,
+        specialty: params.specialty,
+        date: params.date,
+        time: params.time,
+        fee: params.fee,
+        image: params.image,
+        status: 'upcoming',
+        bookingDate: new Date().toISOString()
+      };
+
+      // Get existing bookings or initialize empty array
+      const existingBookings = await AsyncStorage.getItem('bookings');
+      const bookings = existingBookings ? JSON.parse(existingBookings) : [];
+      
+      // Add new booking
+      bookings.push(booking);
+      
+      // Save updated bookings
+      await AsyncStorage.setItem('bookings', JSON.stringify(bookings));
+      
+      return true;
+    } catch (error) {
+      console.error('Error storing booking:', error);
+      return false;
+    }
+  };
+
   const handleConfirmBooking = () => {
     setShowConfirmModal(true);
   };
 
-  const handleConfirmYes = () => {
+  const handleConfirmYes = async () => {
     setShowConfirmModal(false);
-    setShowSuccessModal(true);
+    const success = await storeBooking();
+    if (success) {
+      setShowSuccessModal(true);
+    } else {
+      alert('Failed to save booking. Please try again.');
+    }
   };
 
   const handleConfirmNo = () => {
@@ -105,7 +142,11 @@ const BookingConfirmation = () => {
   const handleSuccessOk = () => {
     setShowSuccessModal(false);
     setShowCalendarModal(false);
-    router.push("/home");
+    // Navigate to MyAppointments with upcoming tab selected
+    router.push({
+      pathname: "/book",
+      params: { tab: 'upcoming' }
+    });
   };
 
   const handleCalendarCancel = () => {
@@ -115,7 +156,11 @@ const BookingConfirmation = () => {
 
   const handleViewMyBook = () => {
     setShowSuccessModal(false);
-    router.push("/book");
+    // Navigate to MyAppointments with upcoming tab selected
+    router.push({
+      pathname: "/book",
+      params: { tab: 'upcoming' }
+    });
   };
 
   return (
@@ -128,7 +173,6 @@ const BookingConfirmation = () => {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Doctor Information Card */}
         <View style={styles.card}>
           <View style={styles.doctorInfoContainer}>
             <Image source={{ uri: params.image }} style={styles.doctorImage} />
@@ -143,7 +187,6 @@ const BookingConfirmation = () => {
           </View>
         </View>
 
-        {/* Booking Details Card */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Booking Details</Text>
           <View style={styles.detailRow}>
@@ -166,7 +209,6 @@ const BookingConfirmation = () => {
           </View>
         </View>
 
-        {/* Payment Summary Card */}
         <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#2a7fba' }]}>
           <Text style={styles.sectionTitle}>Payment Summary</Text>
           <View style={styles.paymentRow}>
@@ -180,7 +222,6 @@ const BookingConfirmation = () => {
           </View>
         </View>
 
-        {/* Policy Notice */}
         <View style={styles.policyContainer}>
           <Icon name="info" size={18} color="#666" style={styles.infoIcon} />
           <Text style={styles.policyText}>
@@ -189,7 +230,6 @@ const BookingConfirmation = () => {
         </View>
       </ScrollView>
 
-      {/* Confirm Button */}
       <TouchableOpacity
         style={styles.confirmButton}
         onPress={handleConfirmBooking}
@@ -198,7 +238,6 @@ const BookingConfirmation = () => {
         <Icon name="check-circle" size={20} color="white" style={styles.buttonIcon} />
       </TouchableOpacity>
 
-      {/* Confirmation Modal */}
       <Modal
         visible={showConfirmModal}
         transparent={true}
@@ -225,7 +264,6 @@ const BookingConfirmation = () => {
         </View>
       </Modal>
 
-      {/* Success Modal */}
       <Modal
         visible={showSuccessModal}
         transparent={true}
@@ -250,7 +288,7 @@ const BookingConfirmation = () => {
               >
                 <Text style={styles.buttonText}>View My Bookings</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.okButton, { flex: 1, }]} onPress={handleSuccessOk}>
+              <TouchableOpacity style={[styles.okButton, { flex: 1 }]} onPress={handleSuccessOk}>
                 <Text style={styles.buttonTextOk}>OK</Text>
               </TouchableOpacity>
             </View>
@@ -258,7 +296,6 @@ const BookingConfirmation = () => {
         </View>
       </Modal>
 
-      {/* Calendar Modal */}
       <Modal
         visible={showCalendarModal}
         transparent={true}

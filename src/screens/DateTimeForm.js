@@ -5,7 +5,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import Header from "../components/Header";
 import { StatusBar } from "expo-status-bar";
 import { Calendar } from 'react-native-calendars';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DateTimeForm = () => {
   const router = useRouter();
@@ -61,27 +60,6 @@ const DateTimeForm = () => {
     { start: "07:00 PM", end: "08:00 PM", status: "Available" },
   ];
 
-  const saveAppointment = async (appointmentData) => {
-    try {
-      const existingAppointments = await AsyncStorage.getItem('appointments');
-      const appointments = existingAppointments ? JSON.parse(existingAppointments) : [];
-      
-      if (appointmentId) {
-        // Update existing appointment
-        const updatedAppointments = appointments.map(apt => 
-          apt.appointmentId === appointmentId ? appointmentData : apt
-        );
-        await AsyncStorage.setItem('appointments', JSON.stringify(updatedAppointments));
-      } else {
-        // Add new appointment
-        appointments.push(appointmentData);
-        await AsyncStorage.setItem('appointments', JSON.stringify(appointments));
-      }
-    } catch (error) {
-      console.error('Error saving appointment:', error);
-    }
-  };
-
   const handleTimeSelection = (slot) => {
     if (slot.status === "Booked") return;
     if (selectedTime === slot.start) {
@@ -114,23 +92,17 @@ const DateTimeForm = () => {
   const handleSubmit = () => {
     if (selectedTime) {
       const slot = timeSlots.find(s => s.start === selectedTime);
-      const appointmentData = {
-        appointmentId: appointmentId || Date.now().toString(),
-        doctorName: doctor.name,
-        specialty: doctor.specialty,
-        image: doctor.image,
-        date: selectedDate,
-        time: `${slot.start} - ${slot.end}`,
-        fee: doctor.fee,
-        status: 'Confirmed',
-        createdAt: new Date().toISOString()
-      };
-
-      saveAppointment(appointmentData);
-
       router.push({
         pathname: "/BookingConfirmation",
-        params: appointmentData,
+        params: {
+          appointmentId: appointmentId || null,
+          doctorName: doctor.name,
+          specialty: doctor.specialty,
+          image: doctor.image,
+          date: selectedDate,
+          time: `${slot.start} - ${slot.end}`,
+          fee: doctor.fee,
+        },
       });
     }
   };
@@ -187,11 +159,11 @@ const DateTimeForm = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.datesContainer}
           >
-            {dates.map((date) => {
+            {dates.map((date, index) => {
               const [dayName, dayNum] = date.split(" ");
               return (
                 <TouchableOpacity
-                  key={date}
+                  key={`${date}-${index}`} // Unique key using date and index
                   style={[
                     styles.dateButton,
                     selectedDate === date && styles.selectedDate
@@ -200,13 +172,13 @@ const DateTimeForm = () => {
                 >
                   <Text style={[
                       styles.dayText,
-                    selectedDate === date && styles.selectedDateText
+                      selectedDate === date && styles.selectedDateText
                   ]}>
                     {dayName}
                   </Text>
                   <Text style={[
                       styles.dateNumText,
-                    selectedDate === date && styles.selectedDateText
+                      selectedDate === date && styles.selectedDateText
                   ]}>
                     {dayNum}
                   </Text>
@@ -219,9 +191,9 @@ const DateTimeForm = () => {
         <View style={styles.timeCard}>
           <Text style={styles.sectionTitle}>Available Time Slots</Text>
           <View style={styles.timeGrid}>
-            {timeSlots.map((slot, index) => (
+            {timeSlots.map((slot) => (
               <TouchableOpacity
-                key={index}
+                key={slot.start} // Unique key using slot.start
                 style={[
                   styles.timeSlot,
                   selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeSlot,
@@ -242,8 +214,9 @@ const DateTimeForm = () => {
                 <View
                   style={[
                     styles.statusBadge,
-                  slot.status === "Available" ? styles.availableBadge : styles.bookedBadge
-                ]}>
+                    slot.status === "Available" ? styles.availableBadge : styles.bookedBadge
+                  ]}
+                >
                   <Text style={styles.statusText}>
                     {slot.status}
                   </Text>
@@ -263,7 +236,7 @@ const DateTimeForm = () => {
         onPress={handleSubmit}
       >
         <View style={styles.buttonContent}>
-          <Text style={styles.bookButtonText} disabled={!selectedTime}>
+          <Text style={styles.bookButtonText}>
             {appointmentId ? "Reschedule Appointment" : "Select Appointment"}
           </Text>
           <Icon name="check-circle" size={20} color="white" />
@@ -469,7 +442,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  secciónTitle: {
+  sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#2c3e50",
