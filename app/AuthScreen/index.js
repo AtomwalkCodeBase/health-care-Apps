@@ -4,11 +4,12 @@ import { View, TextInput, TouchableOpacity, Alert } from "react-native";
 import { MaterialIcons, FontAwesome } from "@expo/vector-icons";
 import Logos from "../../assets/images/Atom_walk_logo.jpg";
 import { useRouter } from "expo-router";
-import { loginURL } from "../../src/services/ConstantServies";
+import { loginURL, userLoginURL } from "../../src/services/ConstantServies";
 import axios from "axios"; // If you prefer axios for API calls
 import { getCompanyInfo } from "../../src/services/authServices";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { publicAxiosRequest } from "../../src/services/HttpMethod";
+import { authAxiosPost, publicAxiosRequest } from "../../src/services/HttpMethod";
+import { customerLogin } from "../../src/services/productServices";
 const LoginScreen = () => {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -26,14 +27,14 @@ const LoginScreen = () => {
   }, []);
   const validateInput = () => {
     if (!username) {
-      setErrorMessage("Username is required");
+      setErrorMessage("User Mobile number is required");
       return false;
     }
     if (!password) {
-      setErrorMessage("Password is required");
+      setErrorMessage("PIn is required");
       return false;
     }
-    if (password.length < 6) {
+    if (password.length < 4) {
       setErrorMessage("Password must be at least 6 characters long");
       return false;
     }
@@ -48,55 +49,58 @@ const LoginScreen = () => {
   };
 
   const handlePress = async () => {
+    let tokens=`bf4401f70476590e194d2ed625f227f9532392c2`;
+    await AsyncStorage.setItem("userToken", tokens);
     if (!validateInput()) {
       return;
     }
     let finalUsername = username;
 
-    // Check if username contains "@" (assuming it's an email)
-    if (!username.includes("@")) {
-      try {
-        // First API call to get the username if it's not an email
-        const userDetailResponse = await axios.get(
-          `https://www.atomwalk.com/api/get_user_detail/?user_id=${username}`
-        );
-        if (userDetailResponse.status === 200) {
-          finalUsername = userDetailResponse.data.username;
-        } else {
-          setErrorMessage("User not found");
-          return;
-        }
-      } catch (error) {
-        console.error("Error fetching username:", error);
-        setErrorMessage("Failed to retrieve user details");
-        return;
-      }
-    }
+    // // Check if username contains "@" (assuming it's an email)
+    // if (!username.includes("@")) {
+    //   try {
+    //     // First API call to get the username if it's not an email
+    //     const userDetailResponse = await axios.get(
+    //       `https://www.atomwalk.com/api/get_user_detail/?user_id=${username}`
+    //     );
+    //     if (userDetailResponse.status === 200) {
+    //       finalUsername = userDetailResponse.data.username;
+    //     } else {
+    //       setErrorMessage("User not found");
+    //       return;
+    //     }
+    //   } catch (error) {
+    //     console.error("Error fetching username:", error);
+    //     setErrorMessage("Failed to retrieve user details");
+    //     return;
+    //   }
+    // }
 
     // Proceed with the login using the final username
     try {
-      const response = await publicAxiosRequest.post(loginURL, {
-        username: finalUsername,
-        password: password,
-      });
+      const response = await customerLogin(finalUsername,password);
 
       if (response.status === 200) {
         AsyncStorage.setItem("Password", password);
         AsyncStorage.setItem("username", finalUsername);
-        getCompanyInfo()
-          .then((res) => {
-            let comanyInfo = res.data;
-            AsyncStorage.setItem("companyInfo", JSON.stringify(comanyInfo));
-            let db_name = comanyInfo.db_name.substr(3);
-            AsyncStorage.setItem("dbName", db_name);
-            console.log(res.data.db_name, db_name, "alldata--->");
-          })
-          .catch((error) => {
-            console.log("ERROR", { error }, error.message);
-          });
+  
+        // getCompanyInfo()
+        //   .then((res) => {
+        //     let comanyInfo = res.data;
+        //     AsyncStorage.setItem("companyInfo", JSON.stringify(comanyInfo));
+        //     let db_name = comanyInfo.db_name.substr(3);
+        //     AsyncStorage.setItem("dbName", db_name);
+        //     console.log(res.data.db_name, db_name, "alldata--->");
+        //   })
+        //   .catch((error) => {
+        //     console.log("ERROR", { error }, error.message);
+        //   });
 
-        const userToken = response.data["key"];
+        const userToken = response.data?.token;
+        const Customer_id = response.data?.customer_id;
+         // Assuming the token is in the response data
         // Store the token in AsyncStorage
+        await AsyncStorage.setItem("Customer_id", Customer_id.toString());
         await AsyncStorage.setItem("userToken", userToken);
         // Navigate to the home screen
         router.push("/home");
@@ -124,7 +128,8 @@ const LoginScreen = () => {
         <InputWrapper>
           <MaterialIcons name="person-outline" size={20} color="#6c757d" />
           <Input
-            placeholder="username"
+            placeholder="Enter Mobile Number"
+            keyboardType="numeric"
             value={username}
             onChangeText={setUsername}
             placeholderTextColor="#6c757d"
@@ -134,7 +139,7 @@ const LoginScreen = () => {
         <InputWrapper>
           <MaterialIcons name="lock-outline" size={20} color="#6c757d" />
           <Input
-            placeholder="password"
+            placeholder="PIN"
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!isPasswordVisible}

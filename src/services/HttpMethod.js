@@ -17,7 +17,7 @@ export const authAxios = async (url, data) => {
 
 export const authAxiosPost = async (url, data) => {
   let token = await AsyncStorage.getItem('userToken');
-  // console.log('authaxios', token, url)
+  console.log('authaxios', token, url)
   return axios.create({
       baseURL: endpoint,
       headers: {
