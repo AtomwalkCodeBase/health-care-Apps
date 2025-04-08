@@ -118,13 +118,13 @@ const LoginScreen = () => {
 
       {/* Login Text */}
       <Title>Log In</Title>
-      <Subtitle>Enter Your Details to Login</Subtitle>
+      <Subtitle> Enter your details to Login</Subtitle>
       {/* Input Fields Section */}
       <InputContainer>
         <InputWrapper>
           <MaterialIcons name="person-outline" size={20} color="#6c757d" />
           <Input
-            placeholder="Enter your username"
+            placeholder="username"
             value={username}
             onChangeText={setUsername}
             placeholderTextColor="#6c757d"
@@ -134,7 +134,7 @@ const LoginScreen = () => {
         <InputWrapper>
           <MaterialIcons name="lock-outline" size={20} color="#6c757d" />
           <Input
-            placeholder="Enter your password"
+            placeholder="password"
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!isPasswordVisible}

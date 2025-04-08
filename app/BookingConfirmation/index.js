@@ -14,7 +14,6 @@ const BookingConfirmation = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
 
-  // Format date to "Friday, 04 April 2025" for display and storage
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -31,24 +30,22 @@ const BookingConfirmation = () => {
     return `${days[dayIndex]}, ${formattedDay} ${months[date.getMonth()]} ${date.getFullYear()}`;
   };
 
-  // Parse the formatted date and time for calendar event
   const parseDateTime = (formattedDate, timeString) => {
     const [dayName, dayMonthYear] = formattedDate.split(', ');
     const [dayNum, monthName, year] = dayMonthYear.split(' ');
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const monthIndex = months.indexOf(monthName);
 
-    const [time, period] = timeString.split(" ");
-    let [hours, minutes] = time.split(":");
-    hours = parseInt(hours);
-    if (period === "PM" && hours !== 12) hours += 12;
-    if (period === "AM" && hours === 12) hours = 0;
+    const [startTime] = timeString.split(" - ");
+    const [time, period] = startTime.match(/(\d+:\d+)([AP]M)/i).slice(1);
+    let [hours, minutes] = time.split(':').map(Number);
+    if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+    if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
 
-    const date = new Date(year, monthIndex, parseInt(dayNum), hours, parseInt(minutes), 0);
+    const date = new Date(year, monthIndex, parseInt(dayNum), hours, minutes, 0);
     return date;
   };
 
-  // Add event to calendar
   const addEventToCalendar = async () => {
     try {
       const { status } = await Calendar.requestCalendarPermissionsAsync();
@@ -73,7 +70,7 @@ const BookingConfirmation = () => {
         startDate,
         endDate,
         location: 'Clinic',
-        notes: `Specialty: ${params.specialty}, Fee: ${params.fee}`,
+        notes: `Specialty: ${params.specialty}`,
         calendarId: writableCalendar.id,
       };
 
@@ -87,33 +84,37 @@ const BookingConfirmation = () => {
     }
   };
 
-  // Store booking details
   const storeBooking = async () => {
     try {
       const booking = {
         id: Date.now().toString(),
-        doctorName: params.doctorName,
+        doctorId: parseInt(params.doctorId),
+        doctorName: params.doctorName, // For display only
         specialty: params.specialty,
-        date: formatDate(params.date), // Store as "Friday, 04 April 2025"
+        date: params.date,
+        fullDate: params.fullDate,
         time: params.time,
-        fee: params.fee,
         image: params.image,
         status: 'upcoming',
         bookingDate: new Date().toISOString()
       };
 
       const existingBookings = await AsyncStorage.getItem('bookings');
-      let bookings = existingBookings ? JSON.parse(existingBookings) : [];
-      if (params.appointmentId) {
-        bookings = bookings.map(b =>
-          b.id === params.appointmentId ? { ...b, date: params.date, time: params.time } : b);
-      }
-      else {
-        bookings.push(booking);
+      const bookings = existingBookings ? JSON.parse(existingBookings) : [];
+
+      const isDuplicate = bookings.some(
+        b => b.doctorId === booking.doctorId &&
+             b.date === booking.date &&
+             b.time === booking.time
+      );
+      if (isDuplicate) {
+        console.log("Duplicate booking detected, skipping save.");
+        return false;
       }
 
+      bookings.push(booking);
       await AsyncStorage.setItem('bookings', JSON.stringify(bookings));
-
+      console.log("Booking saved successfully:", booking);
       return true;
     } catch (error) {
       console.error('Error storing booking:', error);
@@ -131,21 +132,18 @@ const BookingConfirmation = () => {
     if (success) {
       setShowSuccessModal(true);
     } else {
-      alert('Failed to save booking. Please try again.');
+      alert('Failed to save booking or slot already booked.');
     }
   };
 
   const handleConfirmNo = () => {
     setShowConfirmModal(false);
+    router.back();
   };
 
   const handleSuccessOk = () => {
     setShowSuccessModal(false);
-    setShowCalendarModal(false);
-    router.push({
-      pathname: "/book",
-      params: { tab: 'upcoming' }
-    });
+    setShowCalendarModal(true);
   };
 
   const handleCalendarCancel = () => {
@@ -211,12 +209,12 @@ const BookingConfirmation = () => {
           <Text style={styles.sectionTitle}>Payment Summary</Text>
           <View style={styles.paymentRow}>
             <Text style={styles.paymentLabel}>Consultation Fee:</Text>
-            <Text style={styles.paymentValue}>{params.fee}</Text>
+            <Text style={styles.paymentValue}>Free</Text>
           </View>
           <View style={styles.divider} />
           <View style={[styles.paymentRow, { marginTop: 12 }]}>
             <Text style={[styles.paymentLabel, styles.totalLabel]}>Total Amount:</Text>
-            <Text style={[styles.paymentValue, styles.totalValue]}>{params.fee}</Text>
+            <Text style={[styles.paymentValue, styles.totalValue]}>Free</Text>
           </View>
         </View>
 
@@ -244,11 +242,9 @@ const BookingConfirmation = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>
-              {params.appointmentId ? "Confirm Reschedule?" : "Confirm Booking?"}
-            </Text>
+            <Text style={styles.modalTitle}>Confirm Booking?</Text>
             <Text style={styles.modalText}>
-              Are you sure you want to {params.appointmentId ? "reschedule" : "book"} this appointment?
+              Are you sure you want to book this appointment?
             </Text>
             <View style={styles.modalButtonContainer}>
               <TouchableOpacity style={styles.yesButton} onPress={handleConfirmYes}>
@@ -271,20 +267,19 @@ const BookingConfirmation = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Icon name="check-circle" size={50} color="#4CAF50" style={styles.successIcon} />
-            <Text style={styles.modalTitle}>Appointment {params.appointmentId ? "Rescheduled":"Booked"}</Text>
+            <Text style={styles.modalTitle}>Appointment Booked</Text>
             <View style={styles.modalTxt}>
-              <Text style={styles.detailText}>Doctor: {params.name}</Text>
+              <Text style={styles.detailText}>Doctor: {params.doctorName}</Text>
               <Text style={styles.detailText}>Specialty: {params.specialty}</Text>
               <Text style={styles.detailText}>Date: {formatDate(params.date)}</Text>
               <Text style={styles.detailText}>Time: {params.time}</Text>
-              <Text style={styles.detailText}>Fee: {params.fee}</Text>
             </View>
             <View style={styles.modalButtonContainer}>
               <TouchableOpacity
                 style={[styles.okButton, { flex: 1, backgroundColor: "#2a7fba", marginRight: 10 }]}
                 onPress={handleViewMyBook}
               >
-                <Text style={styles.buttonText}>View My Bookings</Text>
+                <Text style={styles.buttonText}>My Bookings</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.okButton, { flex: 1 }]} onPress={handleSuccessOk}>
                 <Text style={styles.buttonTextOk}>OK</Text>
@@ -321,17 +316,9 @@ const BookingConfirmation = () => {
   );
 };
 
-// Styles remain unchanged
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-    marginTop: 30
-  },
-  scrollContainer: {
-    padding: 20,
-    paddingBottom: 100,
-  },
+  container: { flex: 1, backgroundColor: "#f5f5f5", marginTop: 30 },
+  scrollContainer: { padding: 20, paddingBottom: 100 },
   card: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
@@ -343,53 +330,15 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-  doctorInfoContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  doctorImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 16,
-    borderWidth: 2,
-    borderColor: "#2a7fba",
-  },
-  doctorTextContainer: {
-    flex: 1,
-  },
-  doctorName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#2c3e50",
-    marginBottom: 4,
-  },
-  specialization: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 6,
-  },
-  ratingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 4,
-  },
-  ratingText: {
-    fontSize: 13,
-    color: "#666",
-    marginLeft: 4,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2a7fba",
-    marginBottom: 16,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 16,
-  },
+  doctorInfoContainer: { flexDirection: "row", alignItems: "center" },
+  doctorImage: { width: 80, height: 80, borderRadius: 40, marginRight: 16, borderWidth: 2, borderColor: "#2a7fba" },
+  doctorTextContainer: { flex: 1 },
+  doctorName: { fontSize: 18, fontWeight: "bold", color: "#2c3e50", marginBottom: 4 },
+  specialization: { fontSize: 14, color: "#666", marginBottom: 6 },
+  ratingContainer: { flexDirection: "row", alignItems: "center", marginTop: 4 },
+  ratingText: { fontSize: 13, color: "#666", marginLeft: 4 },
+  sectionTitle: { fontSize: 16, fontWeight: "600", color: "#2a7fba", marginBottom: 16 },
+  detailRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 16 },
   iconContainer: {
     backgroundColor: "#E3F2FD",
     width: 40,
@@ -399,43 +348,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 12,
   },
-  detailLabel: {
-    fontSize: 13,
-    color: "#888",
-    marginBottom: 2,
-  },
-  detailText: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: "#2c3e50",
-  },
-  paymentRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  paymentLabel: {
-    fontSize: 14,
-    color: "#666",
-  },
-  paymentValue: {
-    fontSize: 14,
-    color: "#2c3e50",
-    fontWeight: "500",
-  },
-  totalLabel: {
-    fontWeight: "600",
-  },
-  totalValue: {
-    color: "#2a7fba",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#e0e0e0",
-    marginVertical: 8,
-  },
+  detailLabel: { fontSize: 13, color: "#888", marginBottom: 2 },
+  detailText: { fontSize: 15, fontWeight: "500", color: "#2c3e50" },
+  paymentRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  paymentLabel: { fontSize: 14, color: "#666" },
+  paymentValue: { fontSize: 14, color: "#2c3e50", fontWeight: "500" },
+  totalLabel: { fontWeight: "600" },
+  totalValue: { color: "#2a7fba", fontWeight: "bold", fontSize: 16 },
+  divider: { height: 1, backgroundColor: "#e0e0e0", marginVertical: 8 },
   policyContainer: {
     flexDirection: "row",
     backgroundColor: "#f9f9f9",
@@ -443,16 +363,8 @@ const styles = StyleSheet.create({
     padding: 12,
     marginTop: 8,
   },
-  infoIcon: {
-    marginRight: 8,
-    marginTop: 2,
-  },
-  policyText: {
-    fontSize: 12,
-    color: "#666",
-    lineHeight: 18,
-    flex: 1,
-  },
+  infoIcon: { marginRight: 8, marginTop: 2 },
+  policyText: { fontSize: 12, color: "#666", lineHeight: 18, flex: 1 },
   confirmButton: {
     position: "absolute",
     bottom: 20,
@@ -470,86 +382,20 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  confirmButtonText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
-    marginRight: 8,
-  },
-  buttonIcon: {
-    marginLeft: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContainer: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 20,
-    width: "90%",
-    maxWidth: 400,
-    alignItems: "center",
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#2c3e50",
-    marginBottom: 10,
-  },
-  modalTxt: {
-    textAlign: "left",
-  },
-  modalText: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "left",
-    marginBottom: 20,
-  },
-  modalButtonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-  },
-  yesButton: {
-    backgroundColor: "#2a7fba",
-    padding: 10,
-    borderRadius: 8,
-    flex: 1,
-    marginRight: 10,
-    alignItems: "center",
-  },
-  noButton: {
-    backgroundColor: "#F44336",
-    padding: 10,
-    borderRadius: 8,
-    flex: 1,
-    alignItems: "center",
-  },
-  okButton: {
-    backgroundColor: "#2a7fba",
-    padding: 12,
-    borderRadius: 8,
-    width: "100%",
-    alignItems: "center",
-    marginTop: 20,
-  },
-  buttonTextOk: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-    padding: 12
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  successIcon: {
-    marginBottom: 20,
-  },
+  confirmButtonText: { color: "white", fontSize: 18, fontWeight: "bold", marginRight: 8 },
+  buttonIcon: { marginLeft: 4 },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+  modalContainer: { backgroundColor: "#ffffff", borderRadius: 16, padding: 20, width: "80%", maxWidth: 400, alignItems: "center" },
+  modalTitle: { fontSize: 20, fontWeight: "bold", color: "#2c3e50", marginBottom: 10 },
+  modalTxt: { textAlign: "left" },
+  modalText: { fontSize: 16, color: "#666", textAlign: "left", marginBottom: 20 },
+  modalButtonContainer: { flexDirection: "row", justifyContent: "space-between", width: "100%" },
+  yesButton: { backgroundColor: "#2a7fba", padding: 10, borderRadius: 8, flex: 1, marginRight: 10, alignItems: "center" },
+  noButton: { backgroundColor: "#F44336", padding: 10, borderRadius: 8, flex: 1, alignItems: "center" },
+  okButton: { backgroundColor: "#2a7fba", paddingVertical: 7, borderRadius: 8, width: "80%", alignItems: "center", marginTop: 20 },
+  buttonTextOk: { color: "white", fontSize: 16, fontWeight: "bold", padding: 12 },
+  buttonText: { color: "white", fontSize: 16, fontWeight: "bold", marginTop: 10 },
+  successIcon: { marginBottom: 20 },
 });
 
 export default BookingConfirmation;

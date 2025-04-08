@@ -15,7 +15,6 @@ const AppointmentScreen = () => {
   const [doctorList, setDoctorList] = useState([]);
   const [specialties, setSpecialties] = useState([{ label: "All", value: "All" }]);
 
-  // Extract unique specialties when doctorList changes
   useEffect(() => {
     if (doctorList.length > 0) {
       const uniqueSpecialties = [...new Set(doctorList.map(doctor => doctor.equipment_type))];
@@ -42,17 +41,23 @@ const AppointmentScreen = () => {
       params: {
         name: selectedDoctor.name,
         specialty: selectedDoctor.equipment_type,
-        image: selectedDoctor.image, 
-        time: selectedDoctor.start_time,
-        fee: selectedDoctor.fee,
-        rating: selectedDoctor.rating,
+        image: selectedDoctor.image,
+        startTime: selectedDoctor.start_time,
+        minUsagePeriod: selectedDoctor.min_usage_period,
+        maxUsagePeriod: selectedDoctor.max_usage_period,
+        unitOfUsage: selectedDoctor.unit_of_usage,
+        numSlots: selectedDoctor.no_of_slots,
+        maxSlotTime: selectedDoctor.max_slot_time,
       },
     });
   };
 
   useEffect(() => {
     getequipmentlistview()
-      .then((res) => setDoctorList(res.data))
+      .then((res) => {
+        console.log("API Response:", res.data); // Log to verify
+        setDoctorList(res.data || []);
+      })
       .catch((error) => console.error("equipment list load failed:", error));
   }, []);
 
@@ -92,9 +97,9 @@ const AppointmentScreen = () => {
               <View style={styles.doctorInfo}>
                 <Text style={styles.doctorName}>{item.name}</Text>
                 <Text style={styles.doctorSpecialty}>{item.equipment_type}</Text>
-                <Text style={styles.doctorDetails}>⏰ Available: {item.start_time}</Text>
-                <Text style={styles.doctorDetails}>💰 Fee: {item.fee}</Text>
-                <Text style={styles.doctorDetails}>⭐ Rating: {item.rating}</Text>
+                <Text style={styles.doctorDetails}>⏰ Start: {item.start_time}</Text>
+                <Text style={styles.doctorDetails}>⏱️ Duration: {item.min_usage_period} {item.unit_of_usage}</Text>
+                <Text style={styles.doctorDetails}>🎰 Slots: {item.no_of_slots}</Text>
               </View>
             </TouchableOpacity>
           )}
@@ -122,20 +127,9 @@ const AppointmentScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "#fff" 
-  },
-  contentContainer: { 
-    flex: 1, 
-    padding: 20,
-    paddingTop: 10
-  },
-  subHeader: { 
-    fontSize: 18, 
-    fontWeight: "600", 
-    marginVertical: 10 
-  },
+  container: { flex: 1, backgroundColor: "#fff" },
+  contentContainer: { flex: 1, padding: 20, paddingTop: 10 },
+  subHeader: { fontSize: 18, fontWeight: "600", marginVertical: 10 },
   doctorCard: { 
     flexDirection: "row", 
     padding: 15, 
@@ -146,47 +140,15 @@ const styles = StyleSheet.create({
     borderWidth: 1, 
     borderColor: "#d1d1d1" 
   },
-  selectedDoctorCard: { 
-    backgroundColor: "#e3f2fd", 
-    borderColor: "#2196f3", 
-    borderWidth: 2 
-  },
-  doctorImage: { 
-    width: 70, 
-    height: 70, 
-    borderRadius: 35, 
-    marginRight: 15 
-  },
-  doctorInfo: { 
-    flex: 1 
-  },
-  doctorName: { 
-    fontSize: 18, 
-    fontWeight: "bold" 
-  },
-  doctorSpecialty: { 
-    fontSize: 14, 
-    color: "#555" 
-  },
-  doctorDetails: { 
-    fontSize: 12, 
-    color: "#777", 
-    marginTop: 2 
-  },
-  bookButtonContainer: { 
-    padding: 20 
-  },
-  bookButton: { 
-    padding: 16, 
-    backgroundColor: "#27ae60", 
-    borderRadius: 10 
-  },
-  bookText: { 
-    textAlign: "center", 
-    color: "white", 
-    fontSize: 18, 
-    fontWeight: "bold" 
-  },
+  selectedDoctorCard: { backgroundColor: "#e3f2fd", borderColor: "#2196f3", borderWidth: 2 },
+  doctorImage: { width: 70, height: 70, borderRadius: 35, marginRight: 15 },
+  doctorInfo: { flex: 1 },
+  doctorName: { fontSize: 18, fontWeight: "bold" },
+  doctorSpecialty: { fontSize: 14, color: "#555" },
+  doctorDetails: { fontSize: 12, color: "#777", marginTop: 2 },
+  bookButtonContainer: { padding: 20 },
+  bookButton: { padding: 16, backgroundColor: "#27ae60", borderRadius: 10 },
+  bookText: { textAlign: "center", color: "white", fontSize: 18, fontWeight: "bold" },
 });
 
 export default AppointmentScreen;

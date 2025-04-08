@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Modal } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -6,22 +6,22 @@ import Header from "../components/Header";
 import { StatusBar } from "expo-status-bar";
 import { Calendar } from 'react-native-calendars';
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
 const DateTimeForm = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
+  
   const doctor = {
-    name: params.name || params.doctorName ,
-    specialty: params.specialty || "Gynecologist",
-    experience: "05+ Years",
-    rating: "4.9 (500)",
-    fee: "₹500",
-    education: ["MD (Gynecology)", "DGO", "MBBS"],
+    name: params.name || "Unknown Doctor",
+    specialty: params.specialty || "Unknown Specialty",
     image: params.image || "https://via.placeholder.com/100",
+    startTime: params.startTime || "10:30",
+    minUsagePeriod: parseFloat(params.minUsagePeriod) || 1.0,
+    maxUsagePeriod: parseFloat(params.maxUsagePeriod) || 2.0,
+    unitOfUsage: params.unitOfUsage || "HOUR",
+    numSlots: parseInt(params.numSlots) || 1,
+    maxSlotTime: params.maxSlotTime || "14:48",
   };
-
-  const appointmentId = params.appointmentId;
-  const initialDate = params.date;
-  const initialTime = params.time;
 
   const generateWeekDates = (startDate) => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -38,35 +38,91 @@ const DateTimeForm = () => {
     });
   };
 
-  const [dates, setDates] = useState(generateWeekDates(initialDate));
-  const [selectedDate, setSelectedDate] = useState(
-    initialDate || generateWeekDates()[0]
-  );
-  const [selectedTime, setSelectedTime] = useState(initialTime || null);
-  const [showCalendar, setShowCalendar] = useState(false);
+  const generateTimeSlots = (startTime, minUsagePeriod, numSlots, maxSlotTime) => {
+    const slots = [];
+    const [startHours, startMinutes] = startTime.split(':').map(Number);
+    const [maxHours, maxMinutes] = maxSlotTime.split(':').map(Number);
+    
+    let currentTime = new Date();
+    currentTime.setHours(startHours, startMinutes, 0);
+    const maxTime = new Date();
+    maxTime.setHours(maxHours, maxMinutes, 0);
+  
+    const isMaxTimeInvalid = currentTime > maxTime;
+    console.log(`Generating slots: startTime=${startTime}, maxSlotTime=${maxSlotTime}, numSlots=${numSlots}, minUsagePeriod=${minUsagePeriod}, isMaxTimeInvalid=${isMaxTimeInvalid}`);
+  
+    for (let i = 0; i < numSlots; i++) {
+      const slotStart = new Date(currentTime);
+      const slotEnd = new Date(slotStart);
+      slotEnd.setMinutes(slotStart.getMinutes() + (minUsagePeriod * 60));
+  
+      if (!isMaxTimeInvalid && slotStart >= maxTime) {
+        console.log(`Stopped at slot ${i}: slotStart=${slotStart.toLocaleTimeString()} >= maxTime=${maxTime.toLocaleTimeString()}`);
+        break;
+      }
+  
+      const formatTime = (date) => {
+        const hrs = date.getHours();
+        const mins = date.getMinutes().toString().padStart(2, '0');
+        const period = hrs >= 12 ? 'PM' : 'AM';
+        const displayHrs = (hrs % 12) || 12;
+        return `${displayHrs}:${mins}${period}`;
+      };
+  
+      slots.push({
+        start: formatTime(slotStart),
+        end: formatTime(slotEnd),
+        status: "Available"
+      });
+  
+      currentTime = slotEnd;
+    }
+    console.log(`Generated slots:`, slots);
+    return slots;
+  };
 
-  const timeSlots = [
-    { start: "08:00 AM", end: "09:00 AM", status: "Available" },
-    { start: "09:00 AM", end: "10:00 AM", status: "Booked" },
-    { start: "10:00 AM", end: "11:00 AM", status: "Available" },
-    { start: "11:00 AM", end: "12:00 PM", status: "Available" },
-    { start: "12:00 PM", end: "01:00 PM", status: "Booked" },
-    { start: "01:00 PM", end: "02:00 PM", status: "Booked" },
-    { start: "02:00 PM", end: "03:00 PM", status: "Available" },
-    { start: "03:00 PM", end: "04:00 PM", status: "Available" },
-    { start: "04:00 PM", end: "05:00 PM", status: "Available" },
-    { start: "05:00 PM", end: "06:00 PM", status: "Booked" },
-    { start: "06:00 PM", end: "07:00 PM", status: "Available" },
-    { start: "07:00 PM", end: "08:00 PM", status: "Available" },
-  ];
+  const [dates, setDates] = useState(generateWeekDates());
+  const [selectedDate, setSelectedDate] = useState(generateWeekDates()[0]);
+  const [selectedTime, setSelectedTime] = useState(null);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [timeSlots, setTimeSlots] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const loadBookings = async () => {
+      const baseSlots = generateTimeSlots(
+        doctor.startTime,
+        doctor.minUsagePeriod,
+        doctor.numSlots,
+        doctor.maxSlotTime
+      );
+      try {
+        const storedBookings = await AsyncStorage.getItem('bookings');
+        const bookings = storedBookings ? JSON.parse(storedBookings) : [];
+        
+        const updatedSlots = baseSlots.map(slot => {
+          const isBooked = bookings.some(booking => 
+            booking.doctorName === doctor.name &&
+            booking.date === selectedDate &&
+            booking.time === `${slot.start} - ${slot.end}`
+          );
+          return {
+            ...slot,
+            status: isBooked ? "Booked" : "Available"
+          };
+        });
+        setTimeSlots(updatedSlots);
+      } catch (error) {
+        console.error("Error loading bookings:", error);
+        setTimeSlots(baseSlots);
+      }
+    };
+    loadBookings();
+  }, [doctor.name, doctor.startTime, doctor.minUsagePeriod, doctor.numSlots, doctor.maxSlotTime, selectedDate]);
 
   const handleTimeSelection = (slot) => {
     if (slot.status === "Booked") return;
-    if (selectedTime === slot.start) {
-      setSelectedTime(null);
-    } else {
-      setSelectedTime(slot.start);
-    }
+    setSelectedTime(selectedTime === slot.start ? null : slot.start);
   };
 
   const handleCalendarSelect = (day) => {
@@ -89,30 +145,31 @@ const DateTimeForm = () => {
     setShowCalendar(false);
   };
 
-  const handleSubmit = async() => {
-    if (selectedTime) {
-      const slot = timeSlots.find(s => s.start === selectedTime);
-        const bookingData =  {
-          appointmentId: appointmentId || null,
-          doctorName: doctor.name,
-          specialty: doctor.specialty,
-          image: doctor.image,
-          date: selectedDate,
-          time: `${slot.start} - ${slot.end}`,
-          fee: doctor.fee,
-        };
-        router.push({
-          pathname:"/BookingConfirmation",
-          params:bookingData,
-      });
-    }
+  const handleSubmit = () => {
+    if (!selectedTime || isSubmitting) return;
+    setIsSubmitting(true);
+
+    const slot = timeSlots.find(s => s.start === selectedTime);
+    const bookingData = {
+      doctorName: doctor.name,
+      specialty: doctor.specialty,
+      image: doctor.image,
+      date: selectedDate,
+      time: `${slot.start} - ${slot.end}`,
+    };
+
+    // Navigate to BookingConfirmation without saving yet
+    router.push({
+      pathname: "/BookingConfirmation",
+      params: bookingData,
+    });
+    setIsSubmitting(false);
   };
 
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
-      <Header title={appointmentId ? "Reschedule Appointment" : "Book an Appointment"} />
-
+      <Header title="Book an Appointment" />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.profileCard}>
           <View style={styles.profileImageContainer}>
@@ -121,27 +178,6 @@ const DateTimeForm = () => {
           </View>
           <Text style={styles.doctorName}>{doctor.name}</Text>
           <Text style={styles.specialization}>{doctor.specialty}</Text>
-          <Text style={styles.education}>{doctor.education.join(" • ")}</Text>
-        </View>
-
-        <View style={styles.statsRow}>
-          <View style={[styles.statCard, { backgroundColor: '#E3F2FD' }]}>
-            <Icon name="work" size={24} color="#2a7fba" />
-            <Text style={styles.statValue}>{doctor.experience}</Text>
-            <Text style={styles.statLabel}>Experience</Text>
-          </View>
-          
-          <View style={[styles.statCard, { backgroundColor: '#FFF8E1' }]}>
-            <Icon name="star" size={24} color="#FFA000" />
-            <Text style={styles.statValue}>{doctor.rating}</Text>
-            <Text style={styles.statLabel}>Rating</Text>
-          </View>
-          
-          <View style={[styles.statCard, { backgroundColor: '#E8F5E9' }]}>
-            <Icon name="currency-rupee" size={24} color="#4CAF50" />
-            <Text style={styles.statValue}>{doctor.fee}</Text>
-            <Text style={styles.statLabel}>Fee</Text>
-          </View>
         </View>
 
         <View style={styles.sectionHeaderContainer}>
@@ -164,7 +200,7 @@ const DateTimeForm = () => {
               const [dayName, dayNum] = date.split(" ");
               return (
                 <TouchableOpacity
-                  key={`${date}-${index}`} // Unique key using date and index
+                  key={`${date}-${index}`}
                   style={[
                     styles.dateButton,
                     selectedDate === date && styles.selectedDate
@@ -172,14 +208,14 @@ const DateTimeForm = () => {
                   onPress={() => setSelectedDate(date)}
                 >
                   <Text style={[
-                      styles.dayText,
-                      selectedDate === date && styles.selectedDateText
+                    styles.dayText,
+                    selectedDate === date && styles.selectedDateText
                   ]}>
                     {dayName}
                   </Text>
                   <Text style={[
-                      styles.dateNumText,
-                      selectedDate === date && styles.selectedDateText
+                    styles.dateNumText,
+                    selectedDate === date && styles.selectedDateText
                   ]}>
                     {dayNum}
                   </Text>
@@ -194,7 +230,7 @@ const DateTimeForm = () => {
           <View style={styles.timeGrid}>
             {timeSlots.map((slot) => (
               <TouchableOpacity
-                key={slot.start} // Unique key using slot.start
+                key={slot.start}
                 style={[
                   styles.timeSlot,
                   selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeSlot,
@@ -231,15 +267,13 @@ const DateTimeForm = () => {
       <TouchableOpacity
         style={[
           styles.bookButton,
-          !selectedTime && { backgroundColor: '#cccccc' },
+          (!selectedTime || isSubmitting) && { backgroundColor: '#cccccc' },
         ]}
-        disabled={!selectedTime}
+        disabled={!selectedTime || isSubmitting}
         onPress={handleSubmit}
       >
         <View style={styles.buttonContent}>
-          <Text style={styles.bookButtonText}>
-            {appointmentId ? "Reschedule Appointment" : "Select Appointment"}
-          </Text>
+          <Text style={styles.bookButtonText}>Select Appointment</Text>
           <Icon name="check-circle" size={20} color="white" />
         </View>
       </TouchableOpacity>
@@ -282,16 +316,8 @@ const DateTimeForm = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-    paddingTop: 25,
-    marginTop: 20,
-  },
-  scrollContainer: {
-    padding: 16,
-    paddingBottom: 100,
-  },
+  container: { flex: 1, backgroundColor: "#f5f5f5", marginTop: 30 },
+  scrollContainer: { padding: 16, paddingBottom: 100 },
   profileCard: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
@@ -299,20 +325,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
     elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
-  profileImageContainer: {
-    position: "relative",
-    marginBottom: 16,
-  },
-  doctorImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
+  profileImageContainer: { position: "relative", marginBottom: 16 },
+  doctorImage: { width: 100, height: 100, borderRadius: 50 },
   statusIndicator: {
     position: "absolute",
     bottom: 5,
@@ -324,53 +339,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "white",
   },
-  doctorName: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#2c3e50",
-    marginBottom: 4,
-  },
-  specialization: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 8,
-  },
-  education: {
-    fontSize: 13,
-    color: "#888",
-    textAlign: "center",
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 12,
-    alignItems: "center",
-    marginHorizontal: 4,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#2c3e50",
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#666",
-    marginTop: 4,
-  },
+  doctorName: { fontSize: 22, fontWeight: "bold", color: "#2c3e50", marginBottom: 4 },
+  specialization: { fontSize: 16, color: "#666", marginBottom: 8 },
   sectionHeaderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -379,30 +349,16 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     marginRight: 8,
   },
-  sectionHeader: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#2c3e50",
-  },
-  calendarButton: {
-    backgroundColor: '#f0f0f0',
-    padding: 8,
-    borderRadius: 20,
-  },
+  sectionHeader: { fontSize: 18, fontWeight: "600", color: "#2c3e50" },
+  calendarButton: { backgroundColor: '#f0f0f0', padding: 8, borderRadius: 20 },
   dateCard: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
-  datesContainer: {
-    paddingHorizontal: 4,
-  },
+  datesContainer: { paddingHorizontal: 4 },
   dateButton: {
     width: 60,
     paddingVertical: 12,
@@ -414,46 +370,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  dayText: {
-    fontSize: 14,
-    color: "#666",
-    fontWeight: "500",
-  },
-  dateNumText: {
-    fontSize: 18,
-    color: "#666",
-    fontWeight: "500",
-    marginTop: 4,
-  },
-  selectedDate: {
-    backgroundColor: "#2a7fba",
-    borderColor: "#2a7fba",
-  },
-  selectedDateText: {
-    color: "white",
-    fontWeight: "600",
-  },
+  dayText: { fontSize: 14, color: "#666", fontWeight: "500" },
+  dateNumText: { fontSize: 18, color: "#666", fontWeight: "500", marginTop: 4 },
+  selectedDate: { backgroundColor: "#2a7fba", borderColor: "#2a7fba" },
+  selectedDateText: { color: "white", fontWeight: "600" },
   timeCard: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
     padding: 16,
     elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#2c3e50",
-    marginBottom: 12,
-  },
-  timeGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-  },
+  sectionTitle: { fontSize: 16, fontWeight: "600", color: "#2c3e50", marginBottom: 12 },
+  timeGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
   timeSlot: {
     width: '48%',
     padding: 12,
@@ -465,14 +393,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#fafafa",
   },
-  selectedTimeSlot: {
-    backgroundColor: "#2a7fba",
-    borderColor: "#2a7fba",
-  },
-  bookedTimeSlot: {
-    backgroundColor: "#EAEAEA",
-    borderColor: "#e0e0e0",
-  },
+  selectedTimeSlot: { backgroundColor: "#2a7fba", borderColor: "#2a7fba" },
+  bookedTimeSlot: { backgroundColor: "#EAEAEA", borderColor: "#e0e0e0" },
   timeRangeText: {
     fontSize: 14,
     color: "#666",
@@ -480,29 +402,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 4,
   },
-  selectedTimeText: {
-    color: "white",
-  },
-  bookedTimeText: {
-    color: "#999",
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginTop: 4,
-  },
-  availableBadge: {
-    backgroundColor: "#E8F5E9",
-  },
-  bookedBadge: {
-    backgroundColor: "#DBDBDB",
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: "#2c3e50",
-  },
+  selectedTimeText: { color: "white" },
+  bookedTimeText: { color: "#999" },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginTop: 4 },
+  availableBadge: { backgroundColor: "#E8F5E9" },
+  bookedBadge: { backgroundColor: "#DBDBDB" },
+  statusText: { fontSize: 12, fontWeight: "500", color: "#2c3e50" },
   bookButton: {
     position: "absolute",
     bottom: 20,
@@ -514,45 +419,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
-  buttonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  bookButtonText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
-    marginRight: 10,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  calendarContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    width: '90%',
-    maxWidth: 400,
-  },
-  closeButton: {
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: '#2a7fba',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
+  buttonContent: { flexDirection: "row", alignItems: "center" },
+  bookButtonText: { color: "white", fontSize: 18, fontWeight: "bold", marginRight: 10 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  calendarContainer: { backgroundColor: '#ffffff', borderRadius: 16, padding: 20, width: '90%', maxWidth: 400 },
+  closeButton: { marginTop: 16, padding: 12, backgroundColor: '#2a7fba', borderRadius: 8, alignItems: 'center' },
+  closeButtonText: { color: 'white', fontWeight: 'bold' },
 });
 
 export default DateTimeForm;

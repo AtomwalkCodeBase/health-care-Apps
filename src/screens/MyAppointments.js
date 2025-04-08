@@ -28,7 +28,7 @@ export const initialAppointmentsData = {
       doctorName: 'Dr. Robert Williams',
       specialty: 'Dermatologist',
       date: '2023-05-10',
-      time: '11:00 AM',
+      time: '11:00AM',
       image: "https://randomuser.me/api/portraits/men/2.jpg",
     }
   ],
@@ -52,10 +52,8 @@ const notifyListeners = () => {
 const formatDate = (dateString) => {
   if (!dateString) return "";
   
-  // If the date is already in the full format (from BookingConfirmation), return as is
   if (dateString.includes(',')) return dateString;
 
-  // Handle the "Fri 4" format
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -73,11 +71,9 @@ const formatDate = (dateString) => {
 const parseDateTime = (dateString, timeString) => {
   console.log('Parsing dateString:', dateString, 'timeString:', timeString);
   
-  // Handle both "Fri 4" and "Friday, 04 April 2025" formats
   let dayNum, monthIndex, year;
   
   if (dateString.includes(',')) {
-    // Handle "Friday, 04 April 2025" format
     const [_, dayMonthYear] = dateString.split(', ');
     const [day, month, yr] = dayMonthYear.split(' ');
     dayNum = parseInt(day);
@@ -85,36 +81,19 @@ const parseDateTime = (dateString, timeString) => {
                  'August', 'September', 'October', 'November', 'December'].indexOf(month);
     year = parseInt(yr);
   } else {
-    // Handle "Fri 4" format
     const [dayAbbr, day] = dateString.split(' ');
     dayNum = parseInt(day);
     monthIndex = new Date().getMonth();
     year = new Date().getFullYear();
   }
 
-  const [time, period] = timeString.split(' ');
-  if (!time || !period) {
-    console.error('Invalid time or period:', time, period);
-    return null;
-  }
-
+  const [startTime] = timeString.split(' - ');
+  const [time, period] = startTime.match(/(\d+:\d+)([AP]M)/i).slice(1);
   let [hours, minutes] = time.split(':').map(Number);
-  if (isNaN(hours) || isNaN(minutes)) {
-    console.error('Invalid hours or minutes:', hours, minutes);
-    return null;
-  }
-
-  if (period === 'PM' && hours !== 12) hours += 12;
-  if (period === 'AM' && hours === 12) hours = 0;
+  if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+  if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
 
   const date = new Date(year, monthIndex, dayNum, hours, minutes, 0);
-
-  if (isNaN(date.getTime())) {
-    console.error('Invalid Date object created:', date);
-    return null;
-  }
-
-  console.log('Parsed date:', date.toISOString());
   return date;
 };
 
@@ -158,7 +137,7 @@ const AppointmentCard = ({ appointment, onUpdate, onDelete, isCancelled, isPast,
             style={[styles.button, styles.calendarButtonStyle]} 
             onPress={() => onAddToCalendar(appointment)}
           >
-            <Ionicons name="calendar" size={18} color={COLORS.white} />
+            <Ionicons name="add-circle" size={18} color={COLORS.white} />
             <Text style={styles.buttonText}> Calendar</Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -203,15 +182,29 @@ export const useAppointments = () => {
       if (storedBookings) {
         const parsedBookings = JSON.parse(storedBookings);
         
+        // Remove duplicates based on doctorName, date, and time
+        const uniqueBookings = [];
+        const seen = new Set();
+        for (const booking of parsedBookings) {
+          const key = `${booking.doctorName}-${booking.date}-${booking.time}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            uniqueBookings.push(booking);
+          }
+        }
+        
         const updatedAppointments = {
-          upcoming: parsedBookings.filter(b => b.status === 'upcoming'),
-          past: appointments.past,
-          cancelled: parsedBookings.filter(b => b.status === 'cancelled')
+          upcoming: uniqueBookings.filter(b => b.status === 'upcoming'),
+          past: appointments.past, // Static past data
+          cancelled: uniqueBookings.filter(b => b.status === 'cancelled')
         };
         
         appointmentsState = updatedAppointments;
         setAppointments(updatedAppointments);
         notifyListeners();
+        
+        // Save cleaned-up data back to AsyncStorage
+        await AsyncStorage.setItem('bookings', JSON.stringify(uniqueBookings));
       }
     } catch (error) {
       console.error('Error loading stored appointments:', error);
@@ -221,18 +214,9 @@ export const useAppointments = () => {
   const saveAppointmentsToStorage = async (updatedAppointments) => {
     try {
       const allBookings = [
-        ...updatedAppointments.upcoming.map(apt => ({
-          ...apt,
-          status: 'upcoming'
-        })),
-        ...updatedAppointments.cancelled.map(apt => ({
-          ...apt,
-          status: 'cancelled'
-        })),
-        ...updatedAppointments.past.map(apt => ({
-          ...apt,
-          status: 'past'
-        }))
+        ...updatedAppointments.upcoming.map(apt => ({ ...apt, status: 'upcoming' })),
+        ...updatedAppointments.cancelled.map(apt => ({ ...apt, status: 'cancelled' })),
+        ...updatedAppointments.past.map(apt => ({ ...apt, status: 'past' }))
       ];
       await AsyncStorage.setItem('bookings', JSON.stringify(allBookings));
     } catch (error) {
@@ -247,11 +231,7 @@ export const useAppointments = () => {
     const updatedAppointments = {
       ...appointmentsState,
       upcoming: appointmentsState.upcoming.filter(a => a.id !== appointmentId),
-      cancelled: [...appointmentsState.cancelled, {
-        ...appointmentToCancel,
-        status: 'cancelled',
-        cancellationDate: new Date().toISOString()
-      }]
+      cancelled: [...appointmentsState.cancelled, { ...appointmentToCancel, status: 'cancelled', cancellationDate: new Date().toISOString() }]
     };
     appointmentsState = updatedAppointments;
     setAppointments(updatedAppointments);
@@ -267,7 +247,7 @@ export default function MyAppointments() {
   const [activeTab, setActiveTab] = useState(tab);
   const [isModalVisible, setModalVisible] = useState(false);
   const [data, setData] = useState('');
-  const [cancelclick, setCancelclick] = useState(false);
+  const [cancelClick, setCancelClick] = useState(false);
   const [rescheduleClick, setRescheduleClick] = useState(false);
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
   const [calendarError, setCalendarError] = useState(null);
@@ -279,14 +259,14 @@ export default function MyAppointments() {
     setActiveTab(tab);
   }, [tab]);
 
-  const movetocancel = () => {
+  const moveToCancel = () => {
     moveToCancelled(data);
     setModalVisible(false);
-    setCancelclick(false);
+    setCancelClick(false);
     setActiveTab('cancelled');
   };
 
-  const onpressyes = () => {
+  const onPressYes = () => {
     if (rescheduleClick) {
       const appointment = appointments.upcoming.find(a => a.id === data);
       if (appointment) {
@@ -294,7 +274,7 @@ export default function MyAppointments() {
           pathname: "/DateTime",
           params: {
             appointmentId: appointment.id,
-            doctorName: appointment.doctorName,
+            name: appointment.doctorName,
             specialty: appointment.specialty,
             image: appointment.image,
             isReschedule: true,
@@ -306,22 +286,22 @@ export default function MyAppointments() {
     }
   };
 
-  const onpresno = () => {
+  const onPressNo = () => {
     setModalVisible(false);
-    setCancelclick(false);
+    setCancelClick(false);
     setRescheduleClick(false);
   };
 
   const handleUpdate = (appointmentId) => {
     setModalVisible(true);
     setData(appointmentId);
-    setCancelclick(false);
+    setCancelClick(false);
     setRescheduleClick(true);
   };
 
   const handleCancel = (appointmentId) => {
     setModalVisible(true);
-    setCancelclick(true);
+    setCancelClick(true);
     setRescheduleClick(false);
     setData(appointmentId);
   };
@@ -352,7 +332,6 @@ export default function MyAppointments() {
       }
 
       const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
-      console.log('Start Date:', startDate.toISOString(), 'End Date:', endDate.toISOString());
 
       const eventDetails = {
         title: `Appointment with ${appointment.doctorName}`,
@@ -378,27 +357,12 @@ export default function MyAppointments() {
       <Header title="My Appointments" />
       
       <View style={styles.tabContainer}>
-        <TabButton
-          label="Upcoming"
-          active={activeTab === 'upcoming'}
-          onPress={() => setActiveTab('upcoming')}
-        />
-        <TabButton
-          label="Past"
-          active={activeTab === 'past'}
-          onPress={() => setActiveTab('past')}
-        />
-        <TabButton
-          label="Cancelled"
-          active={activeTab === 'cancelled'}
-          onPress={() => setActiveTab('cancelled')}
-        />
+        <TabButton label="Upcoming" active={activeTab === 'upcoming'} onPress={() => setActiveTab('upcoming')} />
+        <TabButton label="Past" active={activeTab === 'past'} onPress={() => setActiveTab('past')} />
+        <TabButton label="Cancelled" active={activeTab === 'cancelled'} onPress={() => setActiveTab('cancelled')} />
       </View>
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {appointments[activeTab]?.length > 0 ? (
           appointments[activeTab].map((appointment) => (
             <AppointmentCard
@@ -430,10 +394,10 @@ export default function MyAppointments() {
       
       <CustomModal
         isModalVisible={isModalVisible}
-        onpressyes={onpressyes}
-        onpresno={onpresno}
-        cancelclick={cancelclick}
-        movetocancel={movetocancel}
+        onpressyes={onPressYes}
+        onpresno={onPressNo}
+        cancelclick={cancelClick}
+        movetocancel={moveToCancel}
         rescheduleClick={rescheduleClick}
       />
 
@@ -458,10 +422,7 @@ export default function MyAppointments() {
                 <Text style={styles.modalText}>Appointment has been successfully added to your calendar!</Text>
               </>
             )}
-            <TouchableOpacity 
-              style={styles.modalButton}
-              onPress={() => setCalendarModalVisible(false)}
-            >
+            <TouchableOpacity style={styles.modalButton} onPress={() => setCalendarModalVisible(false)}>
               <Text style={styles.modalButtonText}>OK</Text>
             </TouchableOpacity>
           </View>
@@ -472,225 +433,44 @@ export default function MyAppointments() {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    marginTop: 30
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    paddingHorizontal: 16,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 16,
-    alignItems: 'center',
-    position: 'relative',
-  },
+  container: { flex: 1, backgroundColor: COLORS.background, marginTop: 30 },
+  tabContainer: { flexDirection: 'row', backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: '#eee', paddingHorizontal: 16 },
+  tabButton: { flex: 1, paddingVertical: 16, alignItems: 'center', position: 'relative' },
   activeTabButton: {},
-  activeTabIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    height: 3,
-    width: '60%',
-    backgroundColor: COLORS.primary,
-    borderRadius: 3,
-  },
-  tabButtonText: {
-    fontSize: 14,
-    color: COLORS.muted,
-    fontWeight: '500',
-  },
-  activeTabButtonText: {
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    padding: 20,
-  },
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cancelledCard: {
-    backgroundColor: COLORS.white,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.danger,
-  },
-  pastCard: {
-    backgroundColor: COLORS.white,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.success,
-  },
-  cardContent: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  imageContainer: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  doctorImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    marginRight: 16,
-    borderWidth: 2,
-    borderColor: COLORS.light,
-  },
-  infoContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  doctorName: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-    color: COLORS.dark,
-  },
-  specialty: {
-    fontSize: 14,
-    color: COLORS.muted,
-    marginBottom: 8,
-  },
-  timeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  dateTime: {
-    fontSize: 16,
-    color: COLORS.dark,
-    marginLeft: 6,
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  cancelledBadge: {
-    backgroundColor: '#FEEBEE',
-  },
-  completedBadge: {
-    backgroundColor: '#E3F2FD',
-  },
-  statusBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  button: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    marginHorizontal: 4,
-    flexDirection: 'row',
-  },
-  calendarButtonStyle: {
-    backgroundColor: COLORS.success,
-  },
-  updateButton: {
-    backgroundColor: COLORS.primary,
-  },
-  deleteButton: {
-    backgroundColor: COLORS.danger,
-  },
-  buttonText: {
-    color: COLORS.white,
-    fontWeight: '500',
-    fontSize: 14,
-    marginLeft: 4,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyIllustration: {
-    backgroundColor: '#E3F2FD',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  noAppointmentsText: {
-    textAlign: 'center',
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.dark,
-  },
-  emptySubtext: {
-    textAlign: 'center',
-    marginTop: 8,
-    fontSize: 14,
-    color: COLORS.muted,
-    maxWidth: '70%',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 20,
-    width: '80%',
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: COLORS.dark,
-    marginBottom: 10,
-  },
-  modalText: {
-    fontSize: 16,
-    color: COLORS.muted,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  modalButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  modalButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  successIcon: {
-    marginBottom: 20,
-  },
+  activeTabIndicator: { position: 'absolute', bottom: 0, height: 3, width: '60%', backgroundColor: COLORS.primary, borderRadius: 3 },
+  tabButtonText: { fontSize: 14, color: COLORS.muted, fontWeight: '500' },
+  activeTabButtonText: { color: COLORS.primary, fontWeight: '600' },
+  scrollContainer: { flexGrow: 1, padding: 20 },
+  card: { backgroundColor: COLORS.white, borderRadius: 12, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  cancelledCard: { backgroundColor: COLORS.white, borderLeftWidth: 4, borderLeftColor: COLORS.danger },
+  pastCard: { backgroundColor: COLORS.white, borderLeftWidth: 4, borderLeftColor: COLORS.success },
+  cardContent: { flexDirection: 'row', marginBottom: 12, alignItems: 'center' },
+  imageContainer: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  doctorImage: { width: 90, height: 90, borderRadius: 45, marginRight: 16, borderWidth: 2, borderColor: COLORS.light },
+  infoContainer: { flex: 1, justifyContent: 'center', position: 'relative' },
+  doctorName: { fontSize: 18, fontWeight: '600', marginBottom: 4, color: COLORS.dark },
+  specialty: { fontSize: 14, color: COLORS.muted, marginBottom: 8 },
+  timeContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  dateTime: { fontSize: 16, color: COLORS.dark, marginLeft: 6 },
+  statusBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, marginTop: 8 },
+  cancelledBadge: { backgroundColor: '#FEEBEE' },
+  completedBadge: { backgroundColor: '#E3F2FD' },
+  statusBadgeText: { fontSize: 12, fontWeight: '600' },
+  buttonContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
+  button: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center', flex: 1, marginHorizontal: 4, flexDirection: 'row' },
+  calendarButtonStyle: { backgroundColor: COLORS.success },
+  updateButton: { backgroundColor: COLORS.primary },
+  deleteButton: { backgroundColor: COLORS.danger },
+  buttonText: { color: COLORS.white, fontWeight: '500', fontSize: 14, marginLeft: 4 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
+  emptyIllustration: { backgroundColor: '#E3F2FD', width: 120, height: 120, borderRadius: 60, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  noAppointmentsText: { textAlign: 'center', marginTop: 8, fontSize: 18, fontWeight: '600', color: COLORS.dark },
+  emptySubtext: { textAlign: 'center', marginTop: 8, fontSize: 14, color: COLORS.muted, maxWidth: '70%' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContainer: { backgroundColor: COLORS.white, borderRadius: 12, padding: 20, width: '80%', alignItems: 'center' },
+  modalTitle: { fontSize: 20, fontWeight: '600', color: COLORS.dark, marginBottom: 10 },
+  modalText: { fontSize: 16, color: COLORS.muted, textAlign: 'center', marginBottom: 20 },
+  modalButton: { backgroundColor: COLORS.primary, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 },
+  modalButtonText: { color: COLORS.white, fontSize: 16, fontWeight: '500' },
+  successIcon: { marginBottom: 20 },
 });

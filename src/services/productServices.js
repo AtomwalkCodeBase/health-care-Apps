@@ -54,7 +54,6 @@ export function getEmpLeave(leave_type , emp_id, year) {
     let data = {};
     return authAxios(getequipmentList)
   }
-
   export function getEmpClaim(res) {
     let data = {
       'call_mode':res
