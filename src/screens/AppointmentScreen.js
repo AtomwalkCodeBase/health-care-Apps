@@ -39,6 +39,7 @@ const AppointmentScreen = () => {
     router.push({
       pathname: "/DateTime",
       params: {
+        id:selectedDoctor.id,
         name: selectedDoctor.name,
         specialty: selectedDoctor.equipment_type,
         image: selectedDoctor.image,

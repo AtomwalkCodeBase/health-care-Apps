@@ -35,7 +35,7 @@ const LoginScreen = () => {
       return false;
     }
     if (password.length < 4) {
-      setErrorMessage("Password must be at least 6 characters long");
+      setErrorMessage("Password must be at least 4 characters long");
       return false;
     }
     setErrorMessage("");

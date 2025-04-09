@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +6,7 @@ import Header from '../components/Header';
 import CustomModal from '../components/CustomModal';
 import * as Calendar from 'expo-calendar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getbookedlistview } from "../services/productServices";
 
 const COLORS = {
   primary: '#2196F3',
@@ -22,16 +23,7 @@ const COLORS = {
 
 export const initialAppointmentsData = {
   upcoming: [],
-  past: [
-    {
-      id: '3',
-      doctorName: 'Dr. Robert Williams',
-      specialty: 'Dermatologist',
-      date: '2023-05-10',
-      time: '11:00AM',
-      image: "https://randomuser.me/api/portraits/men/2.jpg",
-    }
-  ],
+  past: [],
   cancelled: []
 };
 
@@ -49,51 +41,109 @@ const notifyListeners = () => {
   listeners.forEach(callback => callback(appointmentsState));
 };
 
+// Helper function to normalize time only for API data, preserving local time
+const normalizeTime = (startTime, endTime) => {
+  if (!startTime || !endTime) return `${startTime || ''}-${endTime || ''}`;
+  const formatTime = (time) => {
+    if (time.includes('AM') || time.includes('PM')) return time;
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 && hours < 24 ? 'PM' : 'AM';
+    const normalizedHours = hours % 12 || 12;
+    return `${normalizedHours}:${minutes < 10 ? '0' + minutes : minutes}${period}`;
+  };
+  return `${formatTime(startTime)}-${formatTime(endTime)}`;
+};
+
 const formatDate = (dateString) => {
-  if (!dateString) return "";
-  
+  if (!dateString || typeof dateString !== 'string') return "Invalid Date";
+
   if (dateString.includes(',')) return dateString;
 
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-  const [dayAbbr, dayNum] = dateString.split(' ');
-  const dayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(dayAbbr);
-  const date = new Date();
-  date.setDate(parseInt(dayNum));
-  date.setMonth(new Date().getMonth());
-  date.setFullYear(new Date().getFullYear());
+  let day, month, year;
 
-  const formattedDay = String(dayNum).padStart(2, '0');
-  return `${days[dayIndex]}, ${formattedDay} ${months[date.getMonth()]} ${date.getFullYear()}`;
+  if (dateString.includes('-')) {
+    [day, month, year] = dateString.split('-').map(Number);
+    if (!day || !month || !year || isNaN(day) || isNaN(month) || isNaN(year)) {
+      console.error("Invalid date format (dd-mm-yyyy):", dateString);
+      return dateString;
+    }
+  } else if (dateString.includes(' ')) {
+    const [dayName, dayNum] = dateString.split(' ');
+    day = parseInt(dayNum);
+    const currentYear = new Date().getFullYear();
+    year = currentYear;
+    month = new Date().getMonth() + 1;
+    if (!day || isNaN(day)) {
+      console.error("Invalid date format (Day dd):", dateString);
+      return dateString;
+    }
+  } else {
+    console.error("Unrecognized date format:", dateString);
+    return dateString;
+  }
+
+  const date = new Date(year, month - 1, day);
+  if (isNaN(date.getTime())) {
+    console.error("Invalid date:", dateString);
+    return dateString;
+  }
+
+  const dayIndex = date.getDay();
+  const formattedDay = String(day).padStart(2, '0');
+  const monthIndex = date.getMonth();
+  return `${days[dayIndex]}, ${formattedDay} ${months[monthIndex]} ${year}`;
+};
+
+const parseFullDate = (dateStr) => {
+  if (!dateStr || typeof dateStr !== 'string') {
+    console.warn("Invalid or missing date string:", dateStr);
+    return null;
+  }
+  if (dateStr.includes('-')) {
+    const [day, month, year] = dateStr.split('-').map(Number);
+    if (!day || !month || !year) return null;
+    return new Date(year, month - 1, day);
+  }
+  if (dateStr.includes(',')) {
+    const [dayName, rest] = dateStr.split(", ");
+    if (!rest) return null;
+    const [day, monthName, year] = rest.split(" ");
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const monthIndex = months.indexOf(monthName);
+    if (monthIndex === -1) return null;
+    return new Date(year, monthIndex, parseInt(day));
+  }
+  const [dayName, day] = dateStr.split(" ");
+  if (!day) return null;
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth();
+  return new Date(currentYear, currentMonth, parseInt(day));
 };
 
 const parseDateTime = (dateString, timeString) => {
-  console.log('Parsing dateString:', dateString, 'timeString:', timeString);
-  
-  let dayNum, monthIndex, year;
-  
-  if (dateString.includes(',')) {
-    const [_, dayMonthYear] = dateString.split(', ');
-    const [day, month, yr] = dayMonthYear.split(' ');
-    dayNum = parseInt(day);
-    monthIndex = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
-                 'August', 'September', 'October', 'November', 'December'].indexOf(month);
-    year = parseInt(yr);
+  if (!dateString || !timeString) return null;
+
+  const date = parseFullDate(dateString);
+  if (!date) return null;
+
+  const [startTime] = timeString.split('-');
+  const match = startTime.match(/(\d+:\d+)([AP]M)?/i);
+  if (!match) return null;
+
+  const [time, period] = match.slice(1);
+  let [hours, minutes] = time.split(':').map(Number);
+  if (period) {
+    if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+    if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
   } else {
-    const [dayAbbr, day] = dateString.split(' ');
-    dayNum = parseInt(day);
-    monthIndex = new Date().getMonth();
-    year = new Date().getFullYear();
+    if (hours >= 12 && hours < 24) hours = hours; // Assume PM for afternoon times
+    else if (hours < 12) hours = hours; // Assume AM for morning times
   }
 
-  const [startTime] = timeString.split(' - ');
-  const [time, period] = startTime.match(/(\d+:\d+)([AP]M)/i).slice(1);
-  let [hours, minutes] = time.split(':').map(Number);
-  if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
-  if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
-
-  const date = new Date(year, monthIndex, dayNum, hours, minutes, 0);
+  date.setHours(hours, minutes, 0, 0);
   return date;
 };
 
@@ -175,43 +225,90 @@ const TabButton = ({ active, label, onPress }) => (
 
 export const useAppointments = () => {
   const [appointments, setAppointments] = useState(initialAppointmentsData);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const loadStoredAppointments = async () => {
+  const fetchBookedAppointments = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const storedBookings = await AsyncStorage.getItem('bookings');
-      if (storedBookings) {
-        const parsedBookings = JSON.parse(storedBookings);
-        
-        // Remove duplicates based on doctorName, date, and time
-        const uniqueBookings = [];
-        const seen = new Set();
-        for (const booking of parsedBookings) {
-          const key = `${booking.doctorName}-${booking.date}-${booking.time}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            uniqueBookings.push(booking);
-          }
-        }
-        
-        const updatedAppointments = {
-          upcoming: uniqueBookings.filter(b => b.status === 'upcoming'),
-          past: appointments.past, // Static past data
-          cancelled: uniqueBookings.filter(b => b.status === 'cancelled')
-        };
-        
-        appointmentsState = updatedAppointments;
-        setAppointments(updatedAppointments);
-        notifyListeners();
-        
-        // Save cleaned-up data back to AsyncStorage
-        await AsyncStorage.setItem('bookings', JSON.stringify(uniqueBookings));
+      const customerId = await AsyncStorage.getItem("Customer_id");
+      console.log("Customer ID:", customerId);
+      if (!customerId) {
+        throw new Error("Customer ID not found. Please log in.");
       }
-    } catch (error) {
-      console.error('Error loading stored appointments:', error);
-    }
-  };
+      const customerIdNumber = parseInt(customerId, 10);
+      const response = await getbookedlistview(customerIdNumber);
+      console.log("API Response:", JSON.stringify(response, null, 2));
 
-  const saveAppointmentsToStorage = async (updatedAppointments) => {
+      const storedBookings = await AsyncStorage.getItem('bookings');
+      const localBookings = storedBookings ? JSON.parse(storedBookings) : [];
+      console.log("Local Bookings:", localBookings);
+
+      let apiAppointments = [];
+      if (response && response.data) {
+        apiAppointments = response.data
+          .filter(booking => booking?.booking_date)
+          .map(booking => ({
+            id: booking?.equipment_data?.id?.toString() || `${Date.now()}-${Math.random()}`,
+            doctorName: booking.equipment_data?.name || 'Unknown Doctor',
+            specialty: booking.equipment_data?.equipment_type || 'Unknown Specialty',
+            date: booking.booking_date,
+            time: normalizeTime(booking?.start_time, booking?.end_time),
+            image: booking.equipment_data?.image || "https://randomuser.me/api/portraits/men/1.jpg",
+            status: booking?.status_display || 'upcoming'
+          }));
+      }
+
+      // Use a Map to deduplicate by id, preferring local bookings
+      const allBookingsMap = new Map();
+
+      // Add local bookings first (preserving exact time from BookingConfirmation.js)
+      localBookings
+        .filter(b => b.date && b.time)
+        .forEach(booking => {
+          allBookingsMap.set(booking.id, booking);
+        });
+
+      // Add API bookings, only if not already present
+      apiAppointments.forEach(apiBooking => {
+        if (!allBookingsMap.has(apiBooking.id)) {
+          allBookingsMap.set(apiBooking.id, apiBooking);
+        }
+      });
+
+      const allBookings = Array.from(allBookingsMap.values());
+
+      const currentDate = new Date();
+      currentDate.setHours(0, 0, 0, 0);
+
+      const updatedAppointments = {
+        upcoming: allBookings.filter(b => {
+          const bookingDate = parseFullDate(b.date);
+          return bookingDate && (b.status === 'upcoming' || b.status === 'BOOKED') && bookingDate >= currentDate;
+        }),
+        past: allBookings.filter(b => {
+          const bookingDate = parseFullDate(b.date);
+          return bookingDate && (b.status === 'upcoming' || b.status === 'BOOKED') && bookingDate < currentDate;
+        }),
+        cancelled: allBookings.filter(b => b.status === 'cancelled' && parseFullDate(b.date))
+      };
+
+      console.log("Filtered Appointments:", updatedAppointments);
+
+      appointmentsState = updatedAppointments;
+      setAppointments(updatedAppointments);
+      notifyListeners();
+      await AsyncStorage.setItem('bookings', JSON.stringify(allBookings));
+    } catch (error) {
+      console.error('Error fetching booked appointments:', error);
+      setError("Failed to fetch appointments: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const saveAppointmentsToStorage = useCallback(async (updatedAppointments) => {
     try {
       const allBookings = [
         ...updatedAppointments.upcoming.map(apt => ({ ...apt, status: 'upcoming' })),
@@ -222,9 +319,9 @@ export const useAppointments = () => {
     } catch (error) {
       console.error('Error saving appointments to storage:', error);
     }
-  };
+  }, []);
 
-  const moveToCancelled = (appointmentId) => {
+  const moveToCancelled = useCallback((appointmentId) => {
     const appointmentToCancel = appointmentsState.upcoming.find(a => a.id === appointmentId);
     if (!appointmentToCancel) return;
 
@@ -237,9 +334,9 @@ export const useAppointments = () => {
     setAppointments(updatedAppointments);
     saveAppointmentsToStorage(updatedAppointments);
     notifyListeners();
-  };
+  }, [saveAppointmentsToStorage]);
 
-  return { appointments, setAppointments, moveToCancelled, loadStoredAppointments };
+  return { appointments, setAppointments, moveToCancelled, fetchBookedAppointments, loading, error };
 };
 
 export default function MyAppointments() {
@@ -251,11 +348,14 @@ export default function MyAppointments() {
   const [rescheduleClick, setRescheduleClick] = useState(false);
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
   const [calendarError, setCalendarError] = useState(null);
-  const { appointments, moveToCancelled, loadStoredAppointments } = useAppointments();
+  const { appointments, moveToCancelled, fetchBookedAppointments, loading, error } = useAppointments();
   const router = useRouter();
 
   useEffect(() => {
-    loadStoredAppointments();
+    fetchBookedAppointments();
+  }, [fetchBookedAppointments]);
+
+  useEffect(() => {
     setActiveTab(tab);
   }, [tab]);
 
@@ -363,7 +463,18 @@ export default function MyAppointments() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {appointments[activeTab]?.length > 0 ? (
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading appointments...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity onPress={fetchBookedAppointments} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : appointments[activeTab]?.length > 0 ? (
           appointments[activeTab].map((appointment) => (
             <AppointmentCard
               key={appointment.id}
@@ -473,4 +584,10 @@ const styles = StyleSheet.create({
   modalButton: { backgroundColor: COLORS.primary, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 },
   modalButtonText: { color: COLORS.white, fontSize: 16, fontWeight: '500' },
   successIcon: { marginBottom: 20 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { fontSize: 16, color: COLORS.muted },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  errorText: { fontSize: 16, color: COLORS.danger, textAlign: 'center', marginBottom: 20 },
+  retryButton: { backgroundColor: COLORS.primary, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 },
+  retryButtonText: { color: COLORS.white, fontSize: 16, fontWeight: '500' },
 });

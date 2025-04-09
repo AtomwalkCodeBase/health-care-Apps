@@ -6,23 +6,26 @@ import Header from "../components/Header";
 import { StatusBar } from "expo-status-bar";
 import { Calendar } from 'react-native-calendars';
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { doctorBookingView } from "../services/productServices";
 
 const DateTimeForm = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
-  
   const doctor = {
+    id:params.id,
+    duration:params.duration,
     name: params.name || "Unknown Doctor",
     specialty: params.specialty || "Unknown Specialty",
     image: params.image || "https://via.placeholder.com/100",
-    startTime: params.startTime || "10:30",
+    startTime: params.startTime ,
+    endTime:params.endTime,
     minUsagePeriod: parseFloat(params.minUsagePeriod) || 1.0,
     maxUsagePeriod: parseFloat(params.maxUsagePeriod) || 2.0,
     unitOfUsage: params.unitOfUsage || "HOUR",
     numSlots: parseInt(params.numSlots) || 1,
     maxSlotTime: params.maxSlotTime || "14:48",
   };
-
+console.log(doctor,"doctordetails");
   const generateWeekDates = (startDate) => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const baseDate = startDate ? new Date(startDate) : new Date();
@@ -151,6 +154,7 @@ const DateTimeForm = () => {
 
     const slot = timeSlots.find(s => s.start === selectedTime);
     const bookingData = {
+      doctorId:doctor.id,
       doctorName: doctor.name,
       specialty: doctor.specialty,
       image: doctor.image,

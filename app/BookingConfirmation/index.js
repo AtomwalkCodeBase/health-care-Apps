@@ -6,6 +6,7 @@ import Header from "../../src/components/Header";
 import { StatusBar } from "expo-status-bar";
 import * as Calendar from 'expo-calendar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doctorBookingView } from "../../src/services/productServices";
 
 const BookingConfirmation = () => {
   const router = useRouter();
@@ -13,19 +14,69 @@ const BookingConfirmation = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const formatDateForAPI = (dateString) => {
+    if (!dateString) return "";
+    const [dayAbbr, dayNum] = dateString.split(" ");
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayIndex = days.indexOf(dayAbbr);
+    const selectedDate = new Date();
+    selectedDate.setDate(parseInt(dayNum));
+
+    const today = new Date();
+    selectedDate.setFullYear(today.getFullYear());
+    if (selectedDate < today && today.getDate() > parseInt(dayNum)) {
+      selectedDate.setMonth(today.getMonth() + 1);
+    } else {
+      selectedDate.setMonth(today.getMonth());
+    }
+
+    const formattedDay = String(selectedDate.getDate()).padStart(2, "0");
+    const formattedMonth = String(selectedDate.getMonth() + 1).padStart(2, "0");
+    const year = selectedDate.getFullYear();
+    return `${formattedDay}-${formattedMonth}-${year}`; // e.g., "08-04-2025"
+  };
+
+  const formatTimeForAPI = (timeStr) => {
+    const cleanTime = timeStr.trim();
+    const [time, period] = cleanTime.match(/(\d+:\d+)([AP]M)/i)?.slice(1) || [];
+    if (!time || !period) return cleanTime; // Fallback to original if parsing fails
+    return `${time} ${period.toLowerCase()}`; // e.g., "10:30 am"
+  };
+
+  const calculateDuration = (startTime, endTime) => {
+    const parseTime = (timeStr) => {
+      const cleanTime = timeStr.trim();
+      const [time, period] = cleanTime.match(/(\d+:\d+)([AP]M)/i)?.slice(1) || [];
+      if (!time || !period) return null;
+      let [hours, minutes] = time.split(':').map(Number);
+      if (period.toUpperCase() === "PM" && hours !== 12) hours += 12;
+      if (period.toUpperCase() === "AM" && hours === 12) hours = 0;
+      return { hours, minutes };
+    };
+
+    const start = parseTime(startTime);
+    const end = parseTime(endTime);
+    if (!start || !end) return 1.0; // Fallback duration
+
+    const startTotalMinutes = start.hours * 60 + start.minutes;
+    let endTotalMinutes = end.hours * 60 + end.minutes;
+    if (endTotalMinutes < startTotalMinutes) endTotalMinutes += 24 * 60; // Handle overnight
+    const durationMinutes = endTotalMinutes - startTotalMinutes;
+    return durationMinutes / 60; // Convert to hours
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
     const [dayAbbr, dayNum] = dateString.split(" ");
     const dayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(dayAbbr);
     const date = new Date();
     date.setDate(parseInt(dayNum));
     date.setMonth(new Date().getMonth());
     date.setFullYear(new Date().getFullYear());
-
     const formattedDay = String(dayNum).padStart(2, '0');
     return `${days[dayIndex]}, ${formattedDay} ${months[date.getMonth()]} ${date.getFullYear()}`;
   };
@@ -35,13 +86,12 @@ const BookingConfirmation = () => {
     const [dayNum, monthName, year] = dayMonthYear.split(' ');
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const monthIndex = months.indexOf(monthName);
-
     const [startTime] = timeString.split(" - ");
-    const [time, period] = startTime.match(/(\d+:\d+)([AP]M)/i).slice(1);
+    const [time, period] = startTime.match(/(\d+:\d+)([AP]M)/i)?.slice(1) || [];
+    if (!time || !period) return null;
     let [hours, minutes] = time.split(':').map(Number);
     if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
     if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
-
     const date = new Date(year, monthIndex, parseInt(dayNum), hours, minutes, 0);
     return date;
   };
@@ -53,18 +103,18 @@ const BookingConfirmation = () => {
         alert('Permission to access calendar was denied');
         return;
       }
-
       const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
       const writableCalendar = calendars.find(cal => cal.allowsModifications) || calendars[0];
-
       if (!writableCalendar) {
         alert('No writable calendar found on this device');
         return;
       }
-
       const startDate = parseDateTime(formatDate(params.date), params.time);
+      if (!startDate) {
+        alert('Invalid date or time format');
+        return;
+      }
       const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
-
       const eventDetails = {
         title: `Appointment with ${params.doctorName}`,
         startDate,
@@ -73,7 +123,6 @@ const BookingConfirmation = () => {
         notes: `Specialty: ${params.specialty}`,
         calendarId: writableCalendar.id,
       };
-
       await Calendar.createEventAsync(writableCalendar.id, eventDetails);
       alert('Event added to calendar successfully!');
       setShowCalendarModal(false);
@@ -89,32 +138,20 @@ const BookingConfirmation = () => {
       const booking = {
         id: Date.now().toString(),
         doctorId: parseInt(params.doctorId),
-        doctorName: params.doctorName, // For display only
+        doctorName: params.doctorName,
         specialty: params.specialty,
         date: params.date,
-        fullDate: params.fullDate,
+        fullDate: formatDate(params.date),
         time: params.time,
         image: params.image,
         status: 'upcoming',
-        bookingDate: new Date().toISOString()
+        bookingDate: new Date().toISOString(),
       };
-
       const existingBookings = await AsyncStorage.getItem('bookings');
       const bookings = existingBookings ? JSON.parse(existingBookings) : [];
-
-      const isDuplicate = bookings.some(
-        b => b.doctorId === booking.doctorId &&
-             b.date === booking.date &&
-             b.time === booking.time
-      );
-      if (isDuplicate) {
-        console.log("Duplicate booking detected, skipping save.");
-        return false;
-      }
-
       bookings.push(booking);
       await AsyncStorage.setItem('bookings', JSON.stringify(bookings));
-      console.log("Booking saved successfully:", booking);
+      console.log("Booking saved to AsyncStorage successfully:", booking);
       return true;
     } catch (error) {
       console.error('Error storing booking:', error);
@@ -123,16 +160,66 @@ const BookingConfirmation = () => {
   };
 
   const handleConfirmBooking = () => {
+    if (isSubmitting) return;
     setShowConfirmModal(true);
   };
 
   const handleConfirmYes = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setShowConfirmModal(false);
-    const success = await storeBooking();
-    if (success) {
-      setShowSuccessModal(true);
-    } else {
-      alert('Failed to save booking or slot already booked.');
+
+    try {
+      const [startTime, endTime] = params.time.split(" - ");
+      const bookingDate = formatDateForAPI(params.date);
+      const formattedStartTime = formatTimeForAPI(startTime); // e.g., "10:30 am"
+      const formattedEndTime = formatTimeForAPI(endTime);     // e.g., "11:30 am"
+      const duration = calculateDuration(startTime, endTime);
+
+      if (!params.doctorId) {
+        throw new Error("Doctor ID is missing.");
+      }
+
+      const customerId = await AsyncStorage.getItem("Customer_id");
+      if (!customerId) {
+        throw new Error("Customer ID not found in AsyncStorage.");
+      }
+
+      console.log("Booking Data:", {
+        customer_id: parseInt(customerId),
+        equipment_id: parseInt(params.doctorId),
+        booking_date: bookingDate,
+        start_time: formattedStartTime,
+        end_time: formattedEndTime,
+        duration: duration,
+      });
+
+      const response = await doctorBookingView(
+        parseInt(customerId), // Pass explicitly instead of relying on function fallback
+        parseInt(params.doctorId),
+        bookingDate,
+        formattedStartTime,
+        formattedEndTime,
+        duration
+      );
+
+      console.log("API Response:", JSON.stringify(response, null, 2));
+
+      if (response && (response.status === 200 || response.data?.success)) {
+        const success = await storeBooking();
+        if (success) {
+          setShowSuccessModal(true);
+        } else {
+          alert('Failed to save booking locally.');
+        }
+      } else {
+        alert('Booking failed. The slot may already be taken or an error occurred on the server.');
+      }
+    } catch (error) {
+      console.error('Error confirming booking:', error.response?.data || error.message || error);
+      alert(`An error occurred while booking: ${error.message || 'Server error (Status 500)'}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -167,7 +254,6 @@ const BookingConfirmation = () => {
         showBackButton
         onBackPress={() => router.back()}
       />
-
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.card}>
           <View style={styles.doctorInfoContainer}>
@@ -182,7 +268,6 @@ const BookingConfirmation = () => {
             </View>
           </View>
         </View>
-
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Booking Details</Text>
           <View style={styles.detailRow}>
@@ -204,20 +289,18 @@ const BookingConfirmation = () => {
             </View>
           </View>
         </View>
-
         <View style={[styles.card, { borderLeftWidth: 4, borderLeftColor: '#2a7fba' }]}>
           <Text style={styles.sectionTitle}>Payment Summary</Text>
           <View style={styles.paymentRow}>
             <Text style={styles.paymentLabel}>Consultation Fee:</Text>
-            <Text style={styles.paymentValue}>Free</Text>
+            <Text style={styles.paymentValue}>500</Text>
           </View>
           <View style={styles.divider} />
           <View style={[styles.paymentRow, { marginTop: 12 }]}>
             <Text style={[styles.paymentLabel, styles.totalLabel]}>Total Amount:</Text>
-            <Text style={[styles.paymentValue, styles.totalValue]}>Free</Text>
+            <Text style={[styles.paymentValue, styles.totalValue]}>500</Text>
           </View>
         </View>
-
         <View style={styles.policyContainer}>
           <Icon name="info" size={18} color="#666" style={styles.infoIcon} />
           <Text style={styles.policyText}>
@@ -225,15 +308,14 @@ const BookingConfirmation = () => {
           </Text>
         </View>
       </ScrollView>
-
       <TouchableOpacity
-        style={styles.confirmButton}
+        style={[styles.confirmButton, isSubmitting && { backgroundColor: '#cccccc' }]}
         onPress={handleConfirmBooking}
+        disabled={isSubmitting}
       >
         <Text style={styles.confirmButtonText}>Confirm Booking</Text>
         <Icon name="check-circle" size={20} color="white" style={styles.buttonIcon} />
       </TouchableOpacity>
-
       <Modal
         visible={showConfirmModal}
         transparent={true}
@@ -247,7 +329,7 @@ const BookingConfirmation = () => {
               Are you sure you want to book this appointment?
             </Text>
             <View style={styles.modalButtonContainer}>
-              <TouchableOpacity style={styles.yesButton} onPress={handleConfirmYes}>
+              <TouchableOpacity style={styles.yesButton} onPress={handleConfirmYes} disabled={isSubmitting}>
                 <Text style={styles.buttonText}>Yes</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.noButton} onPress={handleConfirmNo}>
@@ -257,7 +339,6 @@ const BookingConfirmation = () => {
           </View>
         </View>
       </Modal>
-
       <Modal
         visible={showSuccessModal}
         transparent={true}
@@ -288,7 +369,6 @@ const BookingConfirmation = () => {
           </View>
         </View>
       </Modal>
-
       <Modal
         visible={showCalendarModal}
         transparent={true}
