@@ -27,10 +27,8 @@ const COLORS = {
 };
 
 const STRINGS = {
-  greeting: (name) => {
-    const parts = name?.split(" ") || [];
-    return `Hello ${parts.length > 1 ? parts[1] : parts[0] || "User"}`;
-  },
+  greeting: (name) =>
+    name ? (name.length > 20 ? `${name.slice(0, 17)}...` : name) : "User",
   searchPlaceholder: "Search doctors or services",
   servicesTitle: "Services",
   doctorsTitle: "Top Rated Doctors",

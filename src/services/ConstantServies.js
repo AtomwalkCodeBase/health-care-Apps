@@ -69,3 +69,4 @@ export const getemployeeList = `${endpoint}/get_employee_list/${db_name}/`;
 export const getequipmentList = `${endpoint}/get_facility_list/${db_name}/`;
 export const getbookedList = `${endpoint}/get_facility_booking_list/${db_name}/`;
 export const doctorbooking = `${endpoint}/process_booking_data/${db_name}/`;
+export const setuserpin = `${endpoint}/set_user_pin/${db_name}/`;

@@ -1,27 +1,18 @@
-import React, {useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated, Easing } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {useNavigation, useRouter } from "expo-router";
+import { useRouter } from 'expo-router';
 import HeaderComponent from './HeaderComponent';
-const ResetPasswordScreen = () => {
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [pin, setPin] = useState('');
+import { setuserpinview } from '../../src/services/productServices'; // Adjust the import path
+
+const ChangePinScreen = () => {
+  const [oldPin, setOldPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const router = useRouter();
-  const [userPin, setUserPin] = useState(null);
 
-  useEffect(() => {
-      const fetchUserPin = async () => {
-          const storedPin = await AsyncStorage.getItem('userPin');
-          setUserPin(storedPin); // storedPin will be `null` if no value is found
-      };
-      fetchUserPin();
-  }, []);
-  const shakeAnim = new Animated.Value(0); // Animation for shaking error message
-
-  
-  const navigation = useNavigation();
+  const shakeAnim = new Animated.Value(0);
 
   const triggerShake = () => {
     Animated.sequence([
@@ -33,82 +24,99 @@ const ResetPasswordScreen = () => {
   };
 
   const handleSubmit = async () => {
-    const userPassword = await AsyncStorage.getItem('Password');
-    console.log(userPassword,"yrfyfyr")
-    const finalUsername = await AsyncStorage.getItem('Username');
-    if (userPassword !== password) {
-      setErrorMessage('Wrong Password');
+    setErrorMessage('');
+
+    if (!oldPin || !newPin || !confirmPin) {
+      setErrorMessage('All fields are required.');
       triggerShake();
       return;
     }
-    if (pin !== confirmPassword) {
-      setErrorMessage('PIN do not match!');
+
+    if (newPin !== confirmPin) {
+      setErrorMessage('New PIN and Confirm PIN do not match.');
       triggerShake();
       return;
-    } else if (pin.length !== 4) {
-      setErrorMessage('Please enter a 4-digit PIN.');
+    }
+
+    if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+      setErrorMessage('Please enter a 4-digit numeric PIN.');
       triggerShake();
       return;
     }
 
     try {
-      await AsyncStorage.setItem('userPin', pin);
-      Alert.alert('Success', 'Your PIN and password have been saved.');
-      setErrorMessage('');
-      router.push({pathname: 'home' });
+      console.log('Submitting:', { oldPin, newPin });
+      const response = await setuserpinview(oldPin, newPin);
+      console.log('API Response:', response);
+
+      if (response.status) {
+        await AsyncStorage.setItem('userPin', newPin);
+        Alert.alert('Success', 'Your PIN has been updated successfully.');
+        router.push({ pathname: 'home' });
+      } else {
+        setErrorMessage(response.message || 'Failed to update PIN.');
+        triggerShake();
+      }
     } catch (error) {
-      console.error(error);
-      Alert.alert('Error', 'An error occurred while saving your data.');
+      const errorMsg = error.response?.data?.message || error.message || 'An error occurred while updating your PIN.';
+      console.error('Error in handleSubmit:', errorMsg);
+      setErrorMessage(errorMsg); // Displays "Old Pin is not valid" from API
+      triggerShake();
     }
   };
 
   return (
     <>
-    <HeaderComponent headerTitle={`${userPin?"Update Your PIN":"Set Your PIN"}`} onBackPress={() => navigation.goBack()}></HeaderComponent>
-    
-    <View style={styles.container}>
-    
-      <Text style={styles.title}>{userPin?"Update Your PIN":"Set Your PIN"}</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Enter Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        placeholderTextColor="#888"
+      <HeaderComponent
+        headerTitle="Update Your PIN"
+        onBackPress={() => router.back()}
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Enter Your 4-Digit PIN"
-        keyboardType="numeric"
-        maxLength={4}
-        value={pin}
-        onChangeText={setPin}
-        secureTextEntry
-        placeholderTextColor="#888"
-      />
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        placeholder="Confirm PIN"
-        value={confirmPassword}
-        onChangeText={setConfirmPassword}
-        placeholderTextColor="#888"
-      />
-      {errorMessage ? (
-        <Animated.Text style={[styles.error, { transform: [{ translateX: shakeAnim }] }]}>
-          {errorMessage}
-        </Animated.Text>
-      ) : null}
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-        <Text style={styles.submitText}>Submit</Text>
-      </TouchableOpacity>
-    </View>
+      <View style={styles.container}>
+        <Text style={styles.title}>Update Your PIN</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter your old PIN"
+          secureTextEntry
+          keyboardType="numeric"
+          maxLength={4}
+          value={oldPin}
+          onChangeText={setOldPin}
+          placeholderTextColor="#888"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Enter your new 4-digit PIN"
+          keyboardType="numeric"
+          maxLength={4}
+          value={newPin}
+          onChangeText={setNewPin}
+          secureTextEntry
+          placeholderTextColor="#888"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Confirm new PIN"
+          keyboardType="numeric"
+          maxLength={4}
+          value={confirmPin}
+          onChangeText={setConfirmPin}
+          secureTextEntry
+          placeholderTextColor="#888"
+        />
+        {errorMessage ? (
+          <Animated.Text style={[styles.error, { transform: [{ translateX: shakeAnim }] }]}>
+            {errorMessage}
+          </Animated.Text>
+        ) : null}
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+          <Text style={styles.submitText}>Submit</Text>
+        </TouchableOpacity>
+      </View>
     </>
   );
 };
 
-export default ResetPasswordScreen;
+export default ChangePinScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -122,7 +130,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
-    color: '#45454',
+    color: '#454545',
   },
   input: {
     height: 50,
@@ -132,7 +140,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     paddingHorizontal: 15,
     backgroundColor: '#ececec',
-    color: '#45454',
+    color: '#454545',
     fontSize: 16,
   },
   error: {

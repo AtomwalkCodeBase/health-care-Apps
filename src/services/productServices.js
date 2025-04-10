@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList, getemployeeList, getequipmentList, userLoginURL, getbookedList, doctorbooking } from "../services/ConstantServies";
+import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList, getemployeeList, getequipmentList, userLoginURL, getbookedList, doctorbooking, setuserpin } from "../services/ConstantServies";
 import { authAxios, authAxiosFilePost, authAxiosPost } from "./HttpMethod";
 
 export function getEmpLeave(leave_type, emp_id, year) {
@@ -128,4 +128,31 @@ export function customerLogin(username, password) {
     'pin': password
   };
   return authAxiosPost(userLoginURL, data)
+}
+export async function setuserpinview(o_pin, n_pin) {
+  try {
+    const customerId = await AsyncStorage.getItem("Customer_id");
+    let customerIdNumber = parseInt(customerId, 10);
+
+    if (isNaN(customerIdNumber)) {
+      throw new Error("Invalid Customer ID: " + customerId);
+    }
+
+    const effectiveCustomerId = customerIdNumber;
+
+    let data = {
+      u_id: effectiveCustomerId,
+      o_pin: o_pin,
+      n_pin: n_pin,
+      user_type: "CUSTOMER",
+    };
+
+    console.log("Sending request to API with data:", data);
+    const response = await authAxiosPost(setuserpin, data);
+    console.log("API Response:", response);
+    return response;
+  } catch (error) {
+    console.error("Error in setuserpinView:", error.response ? error.response.data : error.message);
+    throw error;
+  }
 }

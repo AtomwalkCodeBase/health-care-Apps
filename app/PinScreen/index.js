@@ -1,6 +1,6 @@
-import React, { useContext, useRef, useState } from 'react';
+import React, { useContext, useRef, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import {
     View,
     Text,
@@ -11,9 +11,8 @@ import {
     ImageBackground,
 } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
-import Icon from 'react-native-vector-icons/Ionicons'; // Import Ionicons for the fingerprint icon
-import { useEffect } from 'react';
-import PinPassword from '../../src/screens/PinPassword';
+import Icon from 'react-native-vector-icons/Ionicons';
+import ChangePassword from '../../src/screens/ChangePassword';
 import { AppContext } from '../../context/AppContext';
 
 const AuthScreen = () => {
@@ -23,40 +22,48 @@ const AuthScreen = () => {
     const [attemptsRemaining, setAttemptsRemaining] = useState(5);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
-    const openpupop=()=>{
-        setModalVisible(true)
-    }
-    
     const maxAttempts = 5;
 
-    const inputRefs = Array(4)
-        .fill()
-        .map(() => useRef(null));
+    const inputRefs = Array(4).fill().map(() => useRef(null));
 
     const handleMPINChange = (text, index) => {
         const updatedMPIN = [...mPIN];
         updatedMPIN[index] = text;
-
         setMPIN(updatedMPIN);
 
         if (text && index < 3) {
             inputRefs[index + 1].current.focus();
-        }
-
-        if (!text && index > 0) {
+        } else if (!text && index > 0) {
             inputRefs[index - 1].current.focus();
         }
     };
-    useEffect(()=>{
-        handleBiometricAuthentication()
-    },[])
+
+    useEffect(() => {
+        handleBiometricAuthentication();
+        const checkStoredPin = async () => {
+            const storedPin = await AsyncStorage.getItem('userPin');
+            console.log('Stored userPin on mount:', storedPin);
+        };
+        checkStoredPin();
+    }, []);
+
     const handleMPINSubmit = async () => {
+        const enteredPin = mPIN.join('');
         const correctMPIN = await AsyncStorage.getItem('userPin');
-        const finalUsername = await AsyncStorage.getItem('username');
-        const userPassword = await AsyncStorage.getItem('Password');
-        if (mPIN.join('') === correctMPIN) {
+        console.log('Entered mPIN:', enteredPin);
+        console.log('Stored userPin:', correctMPIN);
+
+        if (enteredPin === correctMPIN) {
             setIsAuthenticated(true);
-            login(finalUsername,userPassword)
+            const finalUsername = await AsyncStorage.getItem('username');
+            try {
+                await login(finalUsername, correctMPIN); // Use userPin instead of userPassword
+                console.log('PIN login successful with:', { finalUsername, pin: correctMPIN });
+                router.push({ pathname: 'home' });
+            } catch (error) {
+                console.error('Login error:', error);
+                Alert.alert('Login Failed', 'Unable to authenticate with PIN.');
+            }
         } else {
             const remaining = attemptsRemaining - 1;
             setAttemptsRemaining(remaining);
@@ -67,9 +74,8 @@ const AuthScreen = () => {
             }
         }
     };
+
     const handleBiometricAuthentication = async () => {
-        const finalUsername = await AsyncStorage.getItem('username');
-        const userPassword = await AsyncStorage.getItem('Password');
         try {
             const biometricAuth = await LocalAuthentication.authenticateAsync({
                 promptMessage: 'Authenticate using biometrics',
@@ -77,15 +83,29 @@ const AuthScreen = () => {
             });
             if (biometricAuth.success) {
                 setIsAuthenticated(true);
-                login(finalUsername,userPassword)
-            } 
+                const finalUsername = await AsyncStorage.getItem('username');
+                const userPin = await AsyncStorage.getItem('userPin');
+                try {
+                    await login(finalUsername, userPin); // Use userPin instead of userPassword
+                    console.log('Biometric login successful with:', { finalUsername, pin: userPin });
+                    router.push({ pathname: 'home' });
+                } catch (error) {
+                    console.error('Biometric login error:', error);
+                    Alert.alert('Login Failed', 'Biometric authentication error.');
+                }
+            }
         } catch (err) {
-            console.error(err);
+            console.error('Biometric auth error:', err);
         }
     };
+
+    const openPopup = () => {
+        setModalVisible(true);
+    };
+
     return (
         <ImageBackground
-            source={require('../../assets/images/Backgroundback.png')} // Example background image URL
+            source={require('../../assets/images/Backgroundback.png')}
             style={styles.background}
         >
             <View style={styles.overlay}>
@@ -115,7 +135,7 @@ const AuthScreen = () => {
                     >
                         <Text style={styles.submitButtonText}>Submit</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity  onPress={openpupop}>
+                    <TouchableOpacity onPress={openPopup}>
                         <Text style={styles.forgotText}>Forgot PIN?</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -127,11 +147,14 @@ const AuthScreen = () => {
                     </TouchableOpacity>
                 </View>
             </View>
-            <PinPassword setModalVisible={setModalVisible} modalVisible={modalVisible}></PinPassword>
+            <ChangePassword setModalVisible={setModalVisible} modalVisible={modalVisible} />
         </ImageBackground>
     );
 };
 
+export default AuthScreen;
+
+// Styles remain unchanged
 const styles = StyleSheet.create({
     background: {
         flex: 1,
@@ -139,7 +162,7 @@ const styles = StyleSheet.create({
     },
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.6)', // Add a transparent overlay for better readability
+        backgroundColor: 'rgba(0,0,0,0.6)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
@@ -221,5 +244,3 @@ const styles = StyleSheet.create({
         marginLeft: 10,
     },
 });
-
-export default AuthScreen;
