@@ -68,16 +68,17 @@ const BookingConfirmation = () => {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return "";
+    if (!dateString || !params.fullDate) return "";
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const [dayAbbr, dayNum] = dateString.split(" ");
     const dayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(dayAbbr);
-    const date = new Date();
-    date.setDate(parseInt(dayNum));
-    date.setMonth(new Date().getMonth());
-    date.setFullYear(new Date().getFullYear());
-    const formattedDay = String(dayNum).padStart(2, '0');
+    
+    // Use fullDate from params instead of assuming current month
+    const [year, month, day] = params.fullDate.split('-').map(Number);
+    const date = new Date(year, month - 1, day); // month - 1 because JS months are 0-indexed
+    
+    const formattedDay = String(date.getDate()).padStart(2, '0');
     return `${days[dayIndex]}, ${formattedDay} ${months[date.getMonth()]} ${date.getFullYear()}`;
   };
 
@@ -230,7 +231,8 @@ const BookingConfirmation = () => {
 
   const handleSuccessOk = () => {
     setShowSuccessModal(false);
-    setShowCalendarModal(true);
+    setShowCalendarModal(false);
+    router.push("/home");
   };
 
   const handleCalendarCancel = () => {

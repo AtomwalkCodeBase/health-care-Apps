@@ -1,6 +1,7 @@
 import React, { useContext, useRef, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
+import NetInfo from '@react-native-community/netinfo';
 import {
     View,
     Text,
@@ -11,71 +12,84 @@ import {
     ImageBackground,
 } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
-import Icon from 'react-native-vector-icons/Ionicons';
-import ChangePassword from '../../src/screens/ChangePassword';
+import Icon from 'react-native-vector-icons/Ionicons'; 
+import PinPassword from '../../src/screens/PinPassword';
 import { AppContext } from '../../context/AppContext';
+import Loader from '../../src/components/old_components/Loader';
+// import ErrorModal from '../../src/components/ErrorModal';  // import your ErrorModal
 
 const AuthScreen = () => {
-    const {login} = useContext(AppContext);
+    const { login, setIsLoading, isLoading } = useContext(AppContext);
     const router = useRouter();
     const [mPIN, setMPIN] = useState(['', '', '', '']);
     const [attemptsRemaining, setAttemptsRemaining] = useState(5);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
-    const maxAttempts = 5;
+    const [isNetworkError, setIsNetworkError] = useState(false);   // new state for error modal
 
+    const openPopup = () => setModalVisible(true);
+    const maxAttempts = 5;
     const inputRefs = Array(4).fill().map(() => useRef(null));
+
+    useEffect(() => {
+        // Check network silently on the first load, without showing an error modal
+        NetInfo.fetch().then(netInfo => {
+            if (netInfo.isConnected) {
+                handleBiometricAuthentication();
+            }
+        });
+    }, []);
+
+    const checkNetworkAndAuthenticate = async () => {
+        const netInfo = await NetInfo.fetch();
+        if (!netInfo.isConnected) {
+            setIsNetworkError(true);  // Show error modal only when the user clicks the button
+            return;
+        }
+        handleBiometricAuthentication();
+    };
+    
 
     const handleMPINChange = (text, index) => {
         const updatedMPIN = [...mPIN];
         updatedMPIN[index] = text;
         setMPIN(updatedMPIN);
 
-        if (text && index < 3) {
-            inputRefs[index + 1].current.focus();
-        } else if (!text && index > 0) {
-            inputRefs[index - 1].current.focus();
-        }
+        if (text && index < 3) inputRefs[index + 1].current.focus();
+        if (!text && index > 0) inputRefs[index - 1].current.focus();
     };
 
-    useEffect(() => {
-        handleBiometricAuthentication();
-        const checkStoredPin = async () => {
-            const storedPin = await AsyncStorage.getItem('userPin');
-            console.log('Stored userPin on mount:', storedPin);
-        };
-        checkStoredPin();
-    }, []);
-
     const handleMPINSubmit = async () => {
-        const enteredPin = mPIN.join('');
-        const correctMPIN = await AsyncStorage.getItem('userPin');
-        console.log('Entered mPIN:', enteredPin);
-        console.log('Stored userPin:', correctMPIN);
-
-        if (enteredPin === correctMPIN) {
-            setIsAuthenticated(true);
-            const finalUsername = await AsyncStorage.getItem('username');
-            try {
-                await login(finalUsername, correctMPIN); // Use userPin instead of userPassword
-                console.log('PIN login successful with:', { finalUsername, pin: correctMPIN });
-                router.push({ pathname: 'home' });
-            } catch (error) {
-                console.error('Login error:', error);
-                Alert.alert('Login Failed', 'Unable to authenticate with PIN.');
-            }
-        } else {
-            const remaining = attemptsRemaining - 1;
-            setAttemptsRemaining(remaining);
-            if (remaining > 0) {
-                Alert.alert('Incorrect mPIN', `${remaining} attempts remaining`);
-            } else {
-                Alert.alert('Account Locked', 'Too many incorrect attempts.');
-            }
+        const netInfo = await NetInfo.fetch();
+        if (!netInfo.isConnected) {
+            setIsNetworkError(true);
+            return;
         }
+    
+        const correctMPIN = await AsyncStorage.getItem('userPin');
+        const finalUsername = await AsyncStorage.getItem('username');
+        const userPassword = await AsyncStorage.getItem('Password');
+    
+        setTimeout(() => {
+            if (mPIN.join('') === correctMPIN) {
+                setIsAuthenticated(true);
+                login(finalUsername, userPassword);
+            } else {
+                const remaining = attemptsRemaining - 1;
+                setAttemptsRemaining(remaining);
+                if (remaining > 0) {
+                    Alert.alert('Incorrect mPIN', `${remaining} attempts remaining`);
+                } else {
+                    Alert.alert('Account Locked', 'Too many incorrect attempts.');
+                }
+            }
+        }, 1000);
     };
 
     const handleBiometricAuthentication = async () => {
+        const finalUsername = await AsyncStorage.getItem('username');
+        const userPassword = await AsyncStorage.getItem('Password');
+
         try {
             const biometricAuth = await LocalAuthentication.authenticateAsync({
                 promptMessage: 'Authenticate using biometrics',
@@ -83,24 +97,11 @@ const AuthScreen = () => {
             });
             if (biometricAuth.success) {
                 setIsAuthenticated(true);
-                const finalUsername = await AsyncStorage.getItem('username');
-                const userPin = await AsyncStorage.getItem('userPin');
-                try {
-                    await login(finalUsername, userPin); // Use userPin instead of userPassword
-                    console.log('Biometric login successful with:', { finalUsername, pin: userPin });
-                    router.push({ pathname: 'home' });
-                } catch (error) {
-                    console.error('Biometric login error:', error);
-                    Alert.alert('Login Failed', 'Biometric authentication error.');
-                }
+                login(finalUsername, userPassword);
             }
         } catch (err) {
-            console.error('Biometric auth error:', err);
+            console.error(err);
         }
-    };
-
-    const openPopup = () => {
-        setModalVisible(true);
     };
 
     return (
@@ -108,6 +109,7 @@ const AuthScreen = () => {
             source={require('../../assets/images/Backgroundback.png')}
             style={styles.background}
         >
+            <Loader visible={isLoading} />
             <View style={styles.overlay}>
                 <View style={styles.card}>
                     <Text style={styles.title}>Login with PIN</Text>
@@ -129,10 +131,7 @@ const AuthScreen = () => {
                             Incorrect mPIN. {attemptsRemaining} attempts remaining.
                         </Text>
                     )}
-                    <TouchableOpacity
-                        style={styles.submitButton}
-                        onPress={handleMPINSubmit}
-                    >
+                    <TouchableOpacity style={styles.submitButton} onPress={handleMPINSubmit}>
                         <Text style={styles.submitButtonText}>Submit</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={openPopup}>
@@ -140,21 +139,19 @@ const AuthScreen = () => {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.fingerprintButton}
-                        onPress={handleBiometricAuthentication}
+                        onPress={checkNetworkAndAuthenticate}
                     >
                         <Icon name="finger-print" size={30} color="#fff" />
                         <Text style={styles.fingerprintButtonText}>Use Fingerprint</Text>
                     </TouchableOpacity>
                 </View>
             </View>
-            <ChangePassword setModalVisible={setModalVisible} modalVisible={modalVisible} />
+            <PinPassword setModalVisible={setModalVisible} modalVisible={modalVisible} />
+
         </ImageBackground>
     );
 };
 
-export default AuthScreen;
-
-// Styles remain unchanged
 const styles = StyleSheet.create({
     background: {
         flex: 1,
@@ -201,11 +198,6 @@ const styles = StyleSheet.create({
         marginHorizontal: 5,
         backgroundColor: '#f9f9f9',
         color: '#333',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 1.5,
-        elevation: 2,
     },
     errorText: {
         color: 'red',
@@ -244,3 +236,5 @@ const styles = StyleSheet.create({
         marginLeft: 10,
     },
 });
+
+export default AuthScreen;

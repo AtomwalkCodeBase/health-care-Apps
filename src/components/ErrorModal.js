@@ -53,10 +53,10 @@ const ErrorModal = ({ visible, message, onClose }) => (
     <ModalContainer>
       <ModalContent>
         <IconContainer>
-          <Image
+          {/* <Image
             source={require('../../assets/images/EmptyState.png')} // replace with your error icon
             style={{ width: 80, height: 80 }}
-          />
+          /> */}
         </IconContainer>
         <TitleText>Oops!</TitleText>
         <MessageText>{message || "Something went wrong, please try again"}</MessageText>

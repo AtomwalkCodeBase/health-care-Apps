@@ -12,32 +12,38 @@ const DateTimeForm = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const doctor = {
-    id:params.id,
-    duration:params.duration,
+    id: params.id,
+    duration: params.duration,
     name: params.name || "Unknown Doctor",
     specialty: params.specialty || "Unknown Specialty",
     image: params.image || "https://via.placeholder.com/100",
-    startTime: params.startTime ,
-    endTime:params.endTime,
+    startTime: params.startTime,
+    endTime: params.endTime,
     minUsagePeriod: parseFloat(params.minUsagePeriod) || 1.0,
     maxUsagePeriod: parseFloat(params.maxUsagePeriod) || 2.0,
     unitOfUsage: params.unitOfUsage || "HOUR",
     numSlots: parseInt(params.numSlots) || 1,
     maxSlotTime: params.maxSlotTime || "14:48",
   };
-console.log(doctor,"doctordetails");
-  const generateWeekDates = (startDate) => {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const baseDate = startDate ? new Date(startDate) : new Date();
-    const currentDate = baseDate.getDate();
-    const currentDay = baseDate.getDay();
+  console.log(doctor, "doctordetails");
 
+  const generateWeekDates = () => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
     return Array.from({ length: 7 }).map((_, i) => {
-      const date = new Date(baseDate);
-      date.setDate(currentDate + (i - currentDay));
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
       const dayName = days[date.getDay()];
       const dayNum = date.getDate();
-      return `${dayName} ${dayNum}`;
+      const month = months[date.getMonth()];
+      const year = date.getFullYear();
+      return {
+        display: `${dayName} ${dayNum} ${month}`,
+        fullDate: `${year}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`
+      };
     });
   };
 
@@ -85,7 +91,8 @@ console.log(doctor,"doctordetails");
   };
 
   const [dates, setDates] = useState(generateWeekDates());
-  const [selectedDate, setSelectedDate] = useState(generateWeekDates()[0]);
+  const [selectedDate, setSelectedDate] = useState(generateWeekDates()[0].display);
+  const [selectedFullDate, setSelectedFullDate] = useState(generateWeekDates()[0].fullDate);
   const [selectedTime, setSelectedTime] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [timeSlots, setTimeSlots] = useState([]);
@@ -129,23 +136,52 @@ console.log(doctor,"doctordetails");
   };
 
   const handleCalendarSelect = (day) => {
-    const date = new Date(day.dateString);
+    const selectedDate = new Date(day.dateString);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      return;
+    }
+
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dayName = days[date.getDay()];
-    const dayNum = date.getDate();
-    const formattedDate = `${dayName} ${dayNum}`;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dayName = days[selectedDate.getDay()];
+    const dayNum = selectedDate.getDate();
+    const month = months[selectedDate.getMonth()];
+    const year = selectedDate.getFullYear();
+    const formattedDate = `${dayName} ${dayNum} ${month}`;
+    const fullDate = `${year}-${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`;
 
     const newWeekDates = Array.from({ length: 7 }).map((_, i) => {
-      const newDate = new Date(date);
-      newDate.setDate(date.getDate() + (i - date.getDay()));
+      const newDate = new Date(selectedDate);
+      newDate.setDate(selectedDate.getDate() + (i - selectedDate.getDay()));
       const newDayName = days[newDate.getDay()];
       const newDayNum = newDate.getDate();
-      return `${newDayName} ${newDayNum}`;
+      const newMonth = months[newDate.getMonth()];
+      const newYear = newDate.getFullYear();
+      return {
+        display: `${newDayName} ${newDayNum} ${newMonth}`,
+        fullDate: `${newYear}-${(newDate.getMonth() + 1).toString().padStart(2, '0')}-${newDayNum.toString().padStart(2, '0')}`
+      };
     });
 
     setDates(newWeekDates);
     setSelectedDate(formattedDate);
+    setSelectedFullDate(fullDate);
     setShowCalendar(false);
+  };
+
+  const handleDateSelection = (dateObj) => {
+    const selectedDate = new Date(dateObj.fullDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      return;
+    }
+    setSelectedDate(dateObj.display);
+    setSelectedFullDate(dateObj.fullDate);
   };
 
   const handleSubmit = () => {
@@ -154,15 +190,15 @@ console.log(doctor,"doctordetails");
 
     const slot = timeSlots.find(s => s.start === selectedTime);
     const bookingData = {
-      doctorId:doctor.id,
+      doctorId: doctor.id,
       doctorName: doctor.name,
       specialty: doctor.specialty,
       image: doctor.image,
       date: selectedDate,
+      fullDate: selectedFullDate,
       time: `${slot.start} - ${slot.end}`,
     };
 
-    // Navigate to BookingConfirmation without saving yet
     router.push({
       pathname: "/BookingConfirmation",
       params: bookingData,
@@ -200,28 +236,40 @@ console.log(doctor,"doctordetails");
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.datesContainer}
           >
-            {dates.map((date, index) => {
-              const [dayName, dayNum] = date.split(" ");
+            {dates.map((dateObj, index) => {
+              const [dayName, dayNum, month] = dateObj.display.split(" ");
+              const isPast = new Date(dateObj.fullDate) < new Date().setHours(0, 0, 0, 0);
               return (
                 <TouchableOpacity
-                  key={`${date}-${index}`}
+                  key={`${dateObj.fullDate}-${index}`}
                   style={[
                     styles.dateButton,
-                    selectedDate === date && styles.selectedDate
+                    selectedDate === dateObj.display && styles.selectedDate,
+                    isPast && styles.disabledDate
                   ]}
-                  onPress={() => setSelectedDate(date)}
+                  onPress={() => handleDateSelection(dateObj)}
+                  disabled={isPast}
                 >
                   <Text style={[
                     styles.dayText,
-                    selectedDate === date && styles.selectedDateText
+                    selectedDate === dateObj.display && styles.selectedDateText,
+                    isPast && styles.disabledText
                   ]}>
                     {dayName}
                   </Text>
                   <Text style={[
                     styles.dateNumText,
-                    selectedDate === date && styles.selectedDateText
+                    selectedDate === dateObj.display && styles.selectedDateText,
+                    isPast && styles.disabledText
                   ]}>
                     {dayNum}
+                  </Text>
+                  <Text style={[
+                    styles.monthText,
+                    selectedDate === dateObj.display && styles.selectedDateText,
+                    isPast && styles.disabledText
+                  ]}>
+                    {month}
                   </Text>
                 </TouchableOpacity>
               );
@@ -292,6 +340,7 @@ console.log(doctor,"doctordetails");
           <View style={styles.calendarContainer}>
             <Calendar
               onDayPress={handleCalendarSelect}
+              minDate={new Date().toISOString().split('T')[0]}
               theme={{
                 backgroundColor: '#ffffff',
                 calendarBackground: '#ffffff',
@@ -364,8 +413,8 @@ const styles = StyleSheet.create({
   },
   datesContainer: { paddingHorizontal: 4 },
   dateButton: {
-    width: 60,
-    paddingVertical: 12,
+    width: 65,
+    paddingVertical: 8,
     marginRight: 8,
     borderRadius: 8,
     borderWidth: 1,
@@ -374,10 +423,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  dayText: { fontSize: 14, color: "#666", fontWeight: "500" },
-  dateNumText: { fontSize: 18, color: "#666", fontWeight: "500", marginTop: 4 },
+  dayText: { fontSize: 12, color: "#666", fontWeight: "500" },
+  dateNumText: { fontSize: 16, color: "#666", fontWeight: "500", marginTop: 1 },
+  monthText: { fontSize: 10, color: "#666", fontWeight: "500", marginTop: 1 },
   selectedDate: { backgroundColor: "#2a7fba", borderColor: "#2a7fba" },
   selectedDateText: { color: "white", fontWeight: "600" },
+  disabledDate: {
+    backgroundColor: '#f0f0f0',
+    borderColor: '#e0e0e0',
+  },
+  disabledText: {
+    color: '#999999',
+  },
   timeCard: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
@@ -406,7 +463,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 4,
   },
-  selectedTimeText: { color: "white" },
+  selectedTimeText: { color: "#ffffff" },
   bookedTimeText: { color: "#999" },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginTop: 4 },
   availableBadge: { backgroundColor: "#E8F5E9" },
