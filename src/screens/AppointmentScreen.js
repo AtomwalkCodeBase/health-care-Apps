@@ -4,7 +4,6 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
-import DropDown from './../components/old_components/DropDown';
 import { router } from "expo-router";
 import Header from '../components/Header';
 import { getequipmentlistview } from "../services/productServices";
@@ -14,6 +13,15 @@ const AppointmentScreen = () => {
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [doctorList, setDoctorList] = useState([]);
   const [specialties, setSpecialties] = useState([{ label: "All", value: "All" }]);
+
+  useEffect(() => {
+    getequipmentlistview()
+      .then((res) => {
+        console.log("API Response:", res.data);
+        setDoctorList(res.data || []);
+      })
+      .catch((error) => console.error("equipment list load failed:", error));
+  }, []);
 
   useEffect(() => {
     if (doctorList.length > 0) {
@@ -39,7 +47,7 @@ const AppointmentScreen = () => {
     router.push({
       pathname: "/DateTime",
       params: {
-        id:selectedDoctor.id,
+        id: selectedDoctor.id,
         name: selectedDoctor.name,
         specialty: selectedDoctor.equipment_type,
         image: selectedDoctor.image,
@@ -53,14 +61,29 @@ const AppointmentScreen = () => {
     });
   };
 
-  useEffect(() => {
-    getequipmentlistview()
-      .then((res) => {
-        console.log("API Response:", res.data); // Log to verify
-        setDoctorList(res.data || []);
-      })
-      .catch((error) => console.error("equipment list load failed:", error));
-  }, []);
+  const renderSpecialtyCard = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.specialtyCard,
+        selectedSpecialty === item.value && styles.selectedSpecialtyCard
+      ]}
+      onPress={() => {
+        setSelectedSpecialty(item.value);
+        setSelectedDoctor(null);
+      }}
+    >
+      <Text 
+        style={[
+          styles.specialtyText,
+          selectedSpecialty === item.value && styles.selectedSpecialtyText
+        ]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
+        {item.label}
+      </Text>
+    </TouchableOpacity>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -70,18 +93,18 @@ const AppointmentScreen = () => {
       
       <View style={styles.contentContainer}>
         <Text style={styles.subHeader}>Select Specialty</Text>
-        <DropDown
-          inputlabel=""
-          inputvalue={selectedSpecialty}
-          placeholder="Specialty"
-          data={specialties}
-          onSelect={(value) => {
-            setSelectedSpecialty(value);
-            setSelectedDoctor(null);
-          }}
-        />
+        <View style={styles.specialtyContainer}>
+          <FlatList
+            data={specialties}
+            renderItem={renderSpecialtyCard}
+            keyExtractor={(item) => item.value}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.specialtyListContent}
+          />
+        </View>
 
-        <Text style={styles.subHeader}>Available Doctors</Text>
+        <Text style={styles.availableDoctorsHeader}>Available Doctors</Text>
         <FlatList
           data={filteredDoctors}
           keyExtractor={(item) => item.id.toString()}
@@ -128,9 +151,58 @@ const AppointmentScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  contentContainer: { flex: 1, padding: 20, paddingTop: 10 },
-  subHeader: { fontSize: 18, fontWeight: "600", marginVertical: 10 },
+  container: { 
+    flex: 1, 
+    backgroundColor: "#fff" 
+  },
+  contentContainer: { 
+    flex: 1, 
+    paddingHorizontal: 20, 
+    paddingTop: 10 
+  },
+  subHeader: { 
+    fontSize: 18, 
+    fontWeight: "600", 
+    marginBottom: 5
+  },
+  specialtyContainer: {
+    marginBottom: 10,
+  },
+  specialtyListContent: {
+    paddingVertical: 3,
+  },
+  specialtyCard: {
+    width: 120,
+    height: 40,
+    paddingHorizontal: 10,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 20,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: "#d1d1d1",
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  selectedSpecialtyCard: {
+    backgroundColor: "#2196f3",
+    borderColor: "#1976d2"
+  },
+  specialtyText: {
+    fontSize: 14,
+    color: "#333",
+    fontWeight: "500",
+    textAlign: "center"
+  },
+  selectedSpecialtyText: {
+    color: "#fff",
+    fontWeight: "600"
+  },
+  availableDoctorsHeader: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 5,
+    marginTop: 10,
+  },
   doctorCard: { 
     flexDirection: "row", 
     padding: 15, 
@@ -141,15 +213,47 @@ const styles = StyleSheet.create({
     borderWidth: 1, 
     borderColor: "#d1d1d1" 
   },
-  selectedDoctorCard: { backgroundColor: "#e3f2fd", borderColor: "#2196f3", borderWidth: 2 },
-  doctorImage: { width: 70, height: 70, borderRadius: 35, marginRight: 15 },
-  doctorInfo: { flex: 1 },
-  doctorName: { fontSize: 18, fontWeight: "bold" },
-  doctorSpecialty: { fontSize: 14, color: "#555" },
-  doctorDetails: { fontSize: 12, color: "#777", marginTop: 2 },
-  bookButtonContainer: { padding: 20 },
-  bookButton: { padding: 16, backgroundColor: "#27ae60", borderRadius: 10 },
-  bookText: { textAlign: "center", color: "white", fontSize: 18, fontWeight: "bold" },
+  selectedDoctorCard: { 
+    backgroundColor: "#e3f2fd", 
+    borderColor: "#2196f3", 
+    borderWidth: 2 
+  },
+  doctorImage: { 
+    width: 70, 
+    height: 70, 
+    borderRadius: 35, 
+    marginRight: 15 
+  },
+  doctorInfo: { 
+    flex: 1 
+  },
+  doctorName: { 
+    fontSize: 18, 
+    fontWeight: "bold" 
+  },
+  doctorSpecialty: { 
+    fontSize: 14, 
+    color: "#555" 
+  },
+  doctorDetails: { 
+    fontSize: 12, 
+    color: "#777", 
+    marginTop: 2 
+  },
+  bookButtonContainer: { 
+    padding: 20 
+  },
+  bookButton: { 
+    padding: 16, 
+    backgroundColor: "#27ae60", 
+    borderRadius: 10 
+  },
+  bookText: { 
+    textAlign: "center", 
+    color: "white", 
+    fontSize: 18, 
+    fontWeight: "bold" 
+  },
 });
 
 export default AppointmentScreen;

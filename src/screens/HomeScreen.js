@@ -14,7 +14,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { getProfileInfo } from "../services/authServices";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { getemployelistview } from "../services/productServices";
-import { getAppointments, subscribeToAppointments } from "./MyAppointments";
+import { getAppointments, subscribeToAppointments, useAppointments } from "./MyAppointments";
 import { StatusBar } from "expo-status-bar";
 
 // Constants
@@ -37,52 +37,64 @@ const STRINGS = {
   bookNow: "Book Now!",
 };
 
-// Services list with validated icons
+// Services list sorted alphabetically
 const serviceList = [
-  { name: "Dentistry", icon: "tooth-outline" },
-  { name: "Neurology", icon: "brain" },
   { name: "Cardiology", icon: "heart-pulse" },
-  { name: "Orthopedics", icon: "walk" },
-  { name: "Pediatrics", icon: "baby-face-outline" },
-  { name: "Radiology", icon: "radiology-box" },
-  { name: "Psychiatry", icon: "emoticon-outline" },
-  { name: "Ophthalmology", icon: "eye-outline" },
-  { name: "Gynecology", icon: "gender-female" },
+  { name: "Dentistry", icon: "tooth-outline" },
   { name: "ENT (Otolaryngology)", icon: "ear-hearing" },
   { name: "Gastroenterology", icon: "stomach" },
-  { name: "Urology", icon: "water" },
-  { name: "Pulmonology", icon: "lungs" },
+  { name: "Gynecology", icon: "gender-female" },
+  { name: "Neurology", icon: "brain" },
   { name: "Oncology", icon: "ribbon" },
-];
-
-
+  { name: "Ophthalmology", icon: "eye-outline" },
+  { name: "Orthopedics", icon: "walk" },
+  { name: "Pediatrics", icon: "baby-face-outline" },
+  { name: "Psychiatry", icon: "emoticon-outline" },
+  { name: "Pulmonology", icon: "lungs" },
+  { name: "Radiology", icon: "radiology-box" },
+  { name: "Urology", icon: "water" },
+].sort((a, b) => a.name.localeCompare(b.name));
 
 const HomeScreen = () => {
   const [profile, setProfile] = useState({});
   const [searchText, setSearchText] = useState("");
   const [isAscending, setIsAscending] = useState(true);
   const [doctorList, setDoctorList] = useState([]);
-  const [appointments, setAppointments] = useState(getAppointments());
+  const [appointments, setAppointments] = useState({ upcoming: [] });
+  const [selectedService, setSelectedService] = useState(null);
+  const { fetchBookedAppointments } = useAppointments(); // Import fetch function
 
   useEffect(() => {
-    // Load initial data
-    getemployelistview()
-      .then((res) => setDoctorList(res.data))
-      .catch((error) => console.error("employee load failed:", error));
-    getProfileInfo()
-      .then((res) => setProfile(res.data))
-      .catch((error) => console.error("Profile load failed:", error));
+    const loadInitialData = async () => {
+      try {
+        // Fetch all initial data concurrently
+        const [employeeRes, profileRes] = await Promise.all([
+          getemployelistview(),
+          getProfileInfo(),
+        ]);
+        setDoctorList(employeeRes.data || []);
+        setProfile(profileRes.data || {});
 
-    // Subscribe to appointment updates
-    const unsubscribe = subscribeToAppointments((updatedAppointments) => {
-      setAppointments(updatedAppointments);
-    });
+        // Fetch appointments explicitly
+        await fetchBookedAppointments();
+        const initialAppointments = getAppointments();
+        setAppointments(initialAppointments || { upcoming: [] });
 
-    // Cleanup subscription on unmount
-    return () => unsubscribe();
-  }, []);
+        // Subscribe to updates
+        const unsubscribe = subscribeToAppointments((updatedAppointments) => {
+          console.log("Appointments updated:", updatedAppointments);
+          setAppointments(updatedAppointments || { upcoming: [] });
+        });
 
-  
+        return () => unsubscribe();
+      } catch (error) {
+        console.error("Initial data load failed:", error);
+      }
+    };
+
+    loadInitialData();
+  }, [fetchBookedAppointments]);
+
   const { filteredServices, filteredDoctors } = useMemo(() => {
     const lowerText = searchText.toLowerCase();
 
@@ -90,32 +102,35 @@ const HomeScreen = () => {
       service.name.toLowerCase().includes(lowerText)
     );
 
-    const matchedDoctors = (doctorList || [])
-      .filter(
-        (doc) =>
-          doc.name?.toLowerCase()?.includes(lowerText) ||
-          doc.specialty?.toLowerCase()?.includes(lowerText)
-      )
-      .sort((a, b) =>
-        isAscending
-          ? (a.name || "").localeCompare(b.name || "")
-          : (b.name || "").localeCompare(a.name || "")
-      );
+    let matchedDoctors = (doctorList || []).filter(
+      (doc) =>
+        (doc.name?.toLowerCase()?.includes(lowerText) ||
+          doc.department_name?.toLowerCase()?.includes(lowerText)) &&
+        (!selectedService || doc.department_name === selectedService)
+    );
 
-      
+    matchedDoctors = matchedDoctors.sort((a, b) =>
+      isAscending
+        ? (a.name || "").localeCompare(b.name || "")
+        : (b.name || "").localeCompare(a.name || "")
+    );
+
     return {
       filteredServices: matchedServices,
       filteredDoctors: matchedDoctors,
     };
-  }, [searchText, isAscending, doctorList]);
+  }, [searchText, isAscending, doctorList, selectedService]);
 
   const toggleSortOrder = () => setIsAscending(!isAscending);
 
-  const handleDoctorPress = (name,image) => {
+  const handleServicePress = (serviceName) => {
+    setSelectedService(serviceName === selectedService ? null : serviceName);
+  };
+
+  const handleDoctorPress = (name, image) => {
     router.push({
       pathname: "/DoctorDetails",
-      params: { name: name,image: image },
-             
+      params: { name: name, image: image },
     });
   };
 
@@ -123,7 +138,7 @@ const HomeScreen = () => {
 
   const AppointmentCard = ({ item }) => (
     <TouchableOpacity style={styles.appointmentCard}>
-      <Image source={{uri:item.image}} style={styles.appointmentImage} />
+      <Image source={{ uri: item.image }} style={styles.appointmentImage} />
       <View style={styles.appointmentInfo}>
         <Text style={styles.appointmentDoctorName}>{item.doctorName}</Text>
         <Text style={styles.appointmentDesignation}>{item.specialty}</Text>
@@ -135,7 +150,13 @@ const HomeScreen = () => {
   );
 
   const ServiceCard = ({ item }) => (
-    <TouchableOpacity style={styles.serviceCard}>
+    <TouchableOpacity
+      style={[
+        styles.serviceCard,
+        selectedService === item.name && styles.selectedServiceCard,
+      ]}
+      onPress={() => handleServicePress(item.name)}
+    >
       <MaterialCommunityIcons
         name={item.icon}
         size={30}
@@ -182,7 +203,7 @@ const HomeScreen = () => {
           </TouchableOpacity>
         </View>
       </View>
-  
+
       <View style={styles.searchContainer}>
         <MaterialCommunityIcons name="magnify" size={22} color="gray" />
         <TextInput
@@ -194,15 +215,19 @@ const HomeScreen = () => {
         />
         <TouchableOpacity onPress={toggleSortOrder} style={styles.filterButton}>
           <MaterialCommunityIcons
-            name={isAscending ? "sort-alphabetical-ascending" : "sort-alphabetical-descending"}
+            name={
+              isAscending
+                ? "sort-alphabetical-ascending"
+                : "sort-alphabetical-descending"
+            }
             size={22}
             color="gray"
           />
         </TouchableOpacity>
       </View>
-  
-      {appointments.upcoming.length > 0 && (
-        <View style={styles.filterixedAppointmentsContainer}>
+
+      {appointments.upcoming?.length > 0 && (
+        <View style={styles.appointmentsContainer}>
           <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
           <FlatList
             horizontal
@@ -214,7 +239,7 @@ const HomeScreen = () => {
           />
         </View>
       )}
-  
+
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionTitle}>{STRINGS.servicesTitle}</Text>
         <FlatList
@@ -225,7 +250,7 @@ const HomeScreen = () => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.servicesContainer}
         />
-  
+
         <Text style={styles.sectionTitle}>{STRINGS.doctorsTitle}</Text>
         {filteredDoctors.length === 0 ? (
           <Text style={styles.noResultsText}>{STRINGS.noDoctors}</Text>
@@ -241,9 +266,9 @@ const HomeScreen = () => {
       </ScrollView>
     </View>
   );
-};
+}; 
 
-// Styles (unchanged)
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -308,6 +333,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.text,
   },
+  filterButton: {
+    padding: 5,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
@@ -326,6 +354,11 @@ const styles = StyleSheet.create({
     padding: 12,
     marginRight: 12,
     minHeight: 80,
+  },
+  selectedServiceCard: {
+    backgroundColor: "#1E40AF",
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   serviceText: {
     color: "#fff",
@@ -387,7 +420,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   appointmentsList: {
-    paddingBottom: 10,
+    paddingBottom: 0,
   },
   appointmentCard: {
     width: Dimensions.get("window").width * 0.7,
