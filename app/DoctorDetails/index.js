@@ -60,7 +60,7 @@ const DoctorProfile = () => {
                 style={styles.profileImage}
               />
               <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.speciality}>Cardiologist</Text>
+              <Text style={styles.speciality}>{item.specialty}</Text>
             </LinearGradient>
           </View>
 
@@ -78,7 +78,7 @@ const DoctorProfile = () => {
           <View style={styles.aboutContainer}>
             <Text style={styles.sectionTitle}>About</Text>
             <Text style={styles.aboutText}> 
-              {item.name} is a highly experienced cardiologist with{" "}
+              {item.name} is a highly experienced in the field of {item.specialty} with{" "}
               <Text style={styles.highlight}>{experience}</Text> of expertise in
               diagnosing and treating heart-related conditions. He has attended
               to over <Text style={styles.highlight}>{patients}</Text>{" "}

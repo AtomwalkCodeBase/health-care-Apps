@@ -1,134 +1,157 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Modal } from "react-native";
+import { 
+  View, 
+  Text, 
+  Image, 
+  TouchableOpacity, 
+  ScrollView, 
+  StyleSheet, 
+  Modal,
+  ActivityIndicator
+} from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Header from "../components/Header";
 import { StatusBar } from "expo-status-bar";
 import { Calendar } from 'react-native-calendars';
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { doctorBookingView } from "../services/productServices";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getbookedlistview } from "../services/productServices";
+import moment from 'moment-timezone';
 
 const DateTimeForm = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const TIMEZONE = 'Asia/Kolkata';
+
   const doctor = {
     id: params.id,
     duration: params.duration,
     name: params.name || "Unknown Doctor",
     specialty: params.specialty || "Unknown Specialty",
     image: params.image || "https://via.placeholder.com/100",
-    startTime: params.startTime,
-    endTime: params.endTime,
+    startTime: params.startTime || "09:00",
+    endTime: params.endTime || "17:00",
     minUsagePeriod: parseFloat(params.minUsagePeriod) || 1.0,
     maxUsagePeriod: parseFloat(params.maxUsagePeriod) || 2.0,
     unitOfUsage: params.unitOfUsage || "HOUR",
-    numSlots: parseInt(params.numSlots) || 1,
-    maxSlotTime: params.maxSlotTime || "14:48",
+    numSlots: parseInt(params.numSlots) || 8,
+    maxSlotTime: params.maxSlotTime || "17:00",
   };
-  console.log(doctor, "doctordetails");
 
   const generateWeekDates = () => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = moment().tz(TIMEZONE).startOf('day');
     
     return Array.from({ length: 7 }).map((_, i) => {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      const dayName = days[date.getDay()];
-      const dayNum = date.getDate();
-      const month = months[date.getMonth()];
-      const year = date.getFullYear();
+      const date = today.clone().add(i, 'days');
+      const dayName = days[date.day()];
+      const dayNum = date.date();
+      const month = months[date.month()];
       return {
         display: `${dayName} ${dayNum} ${month}`,
-        fullDate: `${year}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`
+        fullDate: date.format('YYYY-MM-DD'),
+        dateObj: date.toDate()
       };
     });
   };
 
+  const normalizeTime = (timeStr) => {
+    if (!timeStr) return "";
+    if (timeStr.includes('AM') || timeStr.includes('PM')) return timeStr;
+    
+    return moment.tz(timeStr, 'HH:mm', TIMEZONE).format('h:mmA');
+  };
+
   const generateTimeSlots = (startTime, minUsagePeriod, numSlots, maxSlotTime) => {
     const slots = [];
-    const [startHours, startMinutes] = startTime.split(':').map(Number);
-    const [maxHours, maxMinutes] = maxSlotTime.split(':').map(Number);
+    const start = moment.tz(startTime, 'HH:mm', TIMEZONE);
+    const maxTime = moment.tz(maxSlotTime, 'HH:mm', TIMEZONE);
     
-    let currentTime = new Date();
-    currentTime.setHours(startHours, startMinutes, 0);
-    const maxTime = new Date();
-    maxTime.setHours(maxHours, maxMinutes, 0);
-  
-    const isMaxTimeInvalid = currentTime > maxTime;
-    console.log(`Generating slots: startTime=${startTime}, maxSlotTime=${maxSlotTime}, numSlots=${numSlots}, minUsagePeriod=${minUsagePeriod}, isMaxTimeInvalid=${isMaxTimeInvalid}`);
-  
+    let currentTime = start.clone();
+
     for (let i = 0; i < numSlots; i++) {
-      const slotStart = new Date(currentTime);
-      const slotEnd = new Date(slotStart);
-      slotEnd.setMinutes(slotStart.getMinutes() + (minUsagePeriod * 60));
-  
-      if (!isMaxTimeInvalid && slotStart >= maxTime) {
-        console.log(`Stopped at slot ${i}: slotStart=${slotStart.toLocaleTimeString()} >= maxTime=${maxTime.toLocaleTimeString()}`);
-        break;
-      }
-  
-      const formatTime = (date) => {
-        const hrs = date.getHours();
-        const mins = date.getMinutes().toString().padStart(2, '0');
-        const period = hrs >= 12 ? 'PM' : 'AM';
-        const displayHrs = (hrs % 12) || 12;
-        return `${displayHrs}:${mins}${period}`;
-      };
-  
+      const slotStart = currentTime.clone();
+      const slotEnd = slotStart.clone().add(minUsagePeriod, 'hours');
+
+      if (slotStart.isSameOrAfter(maxTime)) break;
+
       slots.push({
-        start: formatTime(slotStart),
-        end: formatTime(slotEnd),
+        start: slotStart.format('h:mmA'),
+        end: slotEnd.format('h:mmA'),
+        start24: slotStart.format('HH:mm'),
+        end24: slotEnd.format('HH:mm'),
         status: "Available"
       });
-  
+
       currentTime = slotEnd;
     }
-    console.log(`Generated slots:`, slots);
     return slots;
   };
 
   const [dates, setDates] = useState(generateWeekDates());
-  const [selectedDate, setSelectedDate] = useState(generateWeekDates()[0].display);
-  const [selectedFullDate, setSelectedFullDate] = useState(generateWeekDates()[0].fullDate);
+  const [selectedDate, setSelectedDate] = useState(dates[0].display);
+  const [selectedFullDate, setSelectedFullDate] = useState(dates[0].fullDate);
   const [selectedTime, setSelectedTime] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [timeSlots, setTimeSlots] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingSlots, setLoadingSlots] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const loadBookings = async () => {
+      setLoadingSlots(true);
+      setError(null);
       const baseSlots = generateTimeSlots(
         doctor.startTime,
         doctor.minUsagePeriod,
         doctor.numSlots,
         doctor.maxSlotTime
       );
+      
       try {
-        const storedBookings = await AsyncStorage.getItem('bookings');
-        const bookings = storedBookings ? JSON.parse(storedBookings) : [];
+        const customerId = await AsyncStorage.getItem("Customer_id");
+        if (!customerId) throw new Error("Customer ID not found");
         
+        const response = await getbookedlistview(parseInt(customerId));
+        
+        const formattedSelectedDate = moment(selectedFullDate).format('DD-MM-YYYY');
+        
+        const bookedSlots = response?.data
+          ?.filter(booking => 
+            booking.equipment_data?.id === parseInt(doctor.id) &&
+            booking.booking_date === formattedSelectedDate
+          )
+          ?.map(booking => ({
+            start: normalizeTime(booking.start_time),
+            end: normalizeTime(booking.end_time),
+            start24: booking.start_time,
+            end24: booking.end_time
+          })) || [];
+
         const updatedSlots = baseSlots.map(slot => {
-          const isBooked = bookings.some(booking => 
-            booking.doctorName === doctor.name &&
-            booking.date === selectedDate &&
-            booking.time === `${slot.start} - ${slot.end}`
+          const isBooked = bookedSlots.some(booking => 
+            booking.start24 === slot.start24 && booking.end24 === slot.end24
           );
           return {
             ...slot,
             status: isBooked ? "Booked" : "Available"
           };
         });
+        
         setTimeSlots(updatedSlots);
-      } catch (error) {
-        console.error("Error loading bookings:", error);
+      } catch (err) {
+        console.error("Error fetching booked slots:", err);
+        setError("Failed to load time slots. Please try again.");
         setTimeSlots(baseSlots);
+      } finally {
+        setLoadingSlots(false);
       }
     };
+    
     loadBookings();
-  }, [doctor.name, doctor.startTime, doctor.minUsagePeriod, doctor.numSlots, doctor.maxSlotTime, selectedDate]);
+  }, [doctor.id, selectedFullDate]);
 
   const handleTimeSelection = (slot) => {
     if (slot.status === "Booked") return;
@@ -136,52 +159,37 @@ const DateTimeForm = () => {
   };
 
   const handleCalendarSelect = (day) => {
-    const selectedDate = new Date(day.dateString);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const selectedDate = moment.tz(day.dateString, 'YYYY-MM-DD', TIMEZONE);
+    const today = moment().tz(TIMEZONE).startOf('day');
     
-    if (selectedDate < today) {
-      return;
-    }
+    if (selectedDate.isBefore(today)) return;
 
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const dayName = days[selectedDate.getDay()];
-    const dayNum = selectedDate.getDate();
-    const month = months[selectedDate.getMonth()];
-    const year = selectedDate.getFullYear();
-    const formattedDate = `${dayName} ${dayNum} ${month}`;
-    const fullDate = `${year}-${(selectedDate.getMonth() + 1).toString().padStart(2, '0')}-${dayNum.toString().padStart(2, '0')}`;
-
-    const newWeekDates = Array.from({ length: 7 }).map((_, i) => {
-      const newDate = new Date(selectedDate);
-      newDate.setDate(selectedDate.getDate() + (i - selectedDate.getDay()));
-      const newDayName = days[newDate.getDay()];
-      const newDayNum = newDate.getDate();
-      const newMonth = months[newDate.getMonth()];
-      const newYear = newDate.getFullYear();
+    
+    const newDates = Array.from({ length: 7 }).map((_, i) => {
+      const date = selectedDate.clone().add(i, 'days');
       return {
-        display: `${newDayName} ${newDayNum} ${newMonth}`,
-        fullDate: `${newYear}-${(newDate.getMonth() + 1).toString().padStart(2, '0')}-${newDayNum.toString().padStart(2, '0')}`
+        display: `${days[date.day()]} ${date.date()} ${months[date.month()]}`,
+        fullDate: date.format('YYYY-MM-DD')
       };
     });
 
-    setDates(newWeekDates);
-    setSelectedDate(formattedDate);
-    setSelectedFullDate(fullDate);
+    setDates(newDates);
+    setSelectedDate(newDates[0].display);
+    setSelectedFullDate(newDates[0].fullDate);
     setShowCalendar(false);
+    setSelectedTime(null);
   };
 
   const handleDateSelection = (dateObj) => {
-    const selectedDate = new Date(dateObj.fullDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const selectedDate = moment.tz(dateObj.fullDate, 'YYYY-MM-DD', TIMEZONE);
+    const today = moment().tz(TIMEZONE).startOf('day');
     
-    if (selectedDate < today) {
-      return;
-    }
+    if (selectedDate.isBefore(today)) return;
     setSelectedDate(dateObj.display);
     setSelectedFullDate(dateObj.fullDate);
+    setSelectedTime(null);
   };
 
   const handleSubmit = () => {
@@ -197,6 +205,10 @@ const DateTimeForm = () => {
       date: selectedDate,
       fullDate: selectedFullDate,
       time: `${slot.start} - ${slot.end}`,
+      startTime: slot.start24,
+      endTime: slot.end24,
+      duration: doctor.minUsagePeriod,
+      timezone: TIMEZONE
     };
 
     router.push({
@@ -206,10 +218,116 @@ const DateTimeForm = () => {
     setIsSubmitting(false);
   };
 
+  const renderDateButtons = () => {
+    return dates.map((dateObj, index) => {
+      const [dayName, dayNum, month] = dateObj.display.split(" ");
+      const isPast = moment.tz(dateObj.fullDate, 'YYYY-MM-DD', TIMEZONE).isBefore(moment().tz(TIMEZONE).startOf('day'));
+      
+      return (
+        <TouchableOpacity
+          key={`${dateObj.fullDate}-${index}`}
+          style={[
+            styles.dateButton,
+            selectedDate === dateObj.display && styles.selectedDate,
+            isPast && styles.disabledDate
+          ]}
+          onPress={() => handleDateSelection(dateObj)}
+          disabled={isPast}
+        >
+          <Text style={[
+            styles.dayText,
+            selectedDate === dateObj.display && styles.selectedDateText,
+            isPast && styles.disabledText
+          ]}>
+            {dayName}
+          </Text>
+          <Text style={[
+            styles.dateNumText,
+            selectedDate === dateObj.display && styles.selectedDateText,
+            isPast && styles.disabledText
+          ]}>
+            {dayNum}
+          </Text>
+          <Text style={[
+            styles.monthText,
+            selectedDate === dateObj.display && styles.selectedDateText,
+            isPast && styles.disabledText
+          ]}>
+            {month}
+          </Text>
+        </TouchableOpacity>
+      );
+    });
+  };
+
+  const renderTimeSlots = () => {
+    if (loadingSlots) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2a7fba" />
+          <Text style={styles.loadingText}>Loading time slots...</Text>
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.errorContainer}>
+          <Icon name="error-outline" size={40} color="#F44336" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => setSelectedFullDate(selectedFullDate)} // Triggers useEffect
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.timeGrid}>
+        {timeSlots.map((slot, index) => (
+          <TouchableOpacity
+            key={`${slot.start}-${index}`}
+            style={[
+              styles.timeSlot,
+              selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeSlot,
+              slot.status === "Booked" && styles.bookedTimeSlot,
+            ]}
+            onPress={() => handleTimeSelection(slot)}
+            disabled={slot.status === "Booked"}
+          >
+            <Text
+              style={[
+                styles.timeRangeText,
+                selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeText,
+                slot.status === "Booked" && styles.bookedTimeText,
+              ]}
+            >
+              {`${slot.start} - ${slot.end}`}
+            </Text>
+            <View
+              style={[
+                styles.statusBadge,
+                slot.status === "Available" ? styles.availableBadge : styles.bookedBadge
+              ]}
+            >
+              <Text style={styles.statusText}>
+                {slot.status}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
       <Header title="Book an Appointment" />
+      
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.profileCard}>
           <View style={styles.profileImageContainer}>
@@ -236,83 +354,13 @@ const DateTimeForm = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.datesContainer}
           >
-            {dates.map((dateObj, index) => {
-              const [dayName, dayNum, month] = dateObj.display.split(" ");
-              const isPast = new Date(dateObj.fullDate) < new Date().setHours(0, 0, 0, 0);
-              return (
-                <TouchableOpacity
-                  key={`${dateObj.fullDate}-${index}`}
-                  style={[
-                    styles.dateButton,
-                    selectedDate === dateObj.display && styles.selectedDate,
-                    isPast && styles.disabledDate
-                  ]}
-                  onPress={() => handleDateSelection(dateObj)}
-                  disabled={isPast}
-                >
-                  <Text style={[
-                    styles.dayText,
-                    selectedDate === dateObj.display && styles.selectedDateText,
-                    isPast && styles.disabledText
-                  ]}>
-                    {dayName}
-                  </Text>
-                  <Text style={[
-                    styles.dateNumText,
-                    selectedDate === dateObj.display && styles.selectedDateText,
-                    isPast && styles.disabledText
-                  ]}>
-                    {dayNum}
-                  </Text>
-                  <Text style={[
-                    styles.monthText,
-                    selectedDate === dateObj.display && styles.selectedDateText,
-                    isPast && styles.disabledText
-                  ]}>
-                    {month}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+            {renderDateButtons()}
           </ScrollView>
         </View>
 
         <View style={styles.timeCard}>
           <Text style={styles.sectionTitle}>Available Time Slots</Text>
-          <View style={styles.timeGrid}>
-            {timeSlots.map((slot) => (
-              <TouchableOpacity
-                key={slot.start}
-                style={[
-                  styles.timeSlot,
-                  selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeSlot,
-                  slot.status === "Booked" && styles.bookedTimeSlot,
-                ]}
-                onPress={() => handleTimeSelection(slot)}
-                disabled={slot.status === "Booked"}
-              >
-                <Text
-                  style={[
-                    styles.timeRangeText,
-                    selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeText,
-                    slot.status === "Booked" && styles.bookedTimeText,
-                  ]}
-                >
-                  {`${slot.start} - ${slot.end}`}
-                </Text>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    slot.status === "Available" ? styles.availableBadge : styles.bookedBadge
-                  ]}
-                >
-                  <Text style={styles.statusText}>
-                    {slot.status}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {renderTimeSlots()}
         </View>
       </ScrollView>
 
@@ -324,10 +372,14 @@ const DateTimeForm = () => {
         disabled={!selectedTime || isSubmitting}
         onPress={handleSubmit}
       >
-        <View style={styles.buttonContent}>
-          <Text style={styles.bookButtonText}>Select Appointment</Text>
-          <Icon name="check-circle" size={20} color="white" />
-        </View>
+        {isSubmitting ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <View style={styles.buttonContent}>
+            <Text style={styles.bookButtonText}>Select Appointment</Text>
+            <Icon name="check-circle" size={20} color="white" />
+          </View>
+        )}
       </TouchableOpacity>
 
       <Modal
@@ -341,6 +393,9 @@ const DateTimeForm = () => {
             <Calendar
               onDayPress={handleCalendarSelect}
               minDate={new Date().toISOString().split('T')[0]}
+              markedDates={{
+                [selectedFullDate]: {selected: true, selectedColor: '#2a7fba'}
+              }}
               theme={{
                 backgroundColor: '#ffffff',
                 calendarBackground: '#ffffff',
@@ -428,13 +483,8 @@ const styles = StyleSheet.create({
   monthText: { fontSize: 10, color: "#666", fontWeight: "500", marginTop: 1 },
   selectedDate: { backgroundColor: "#2a7fba", borderColor: "#2a7fba" },
   selectedDateText: { color: "white", fontWeight: "600" },
-  disabledDate: {
-    backgroundColor: '#f0f0f0',
-    borderColor: '#e0e0e0',
-  },
-  disabledText: {
-    color: '#999999',
-  },
+  disabledDate: { backgroundColor: '#f0f0f0', borderColor: '#e0e0e0' },
+  disabledText: { color: '#999999' },
   timeCard: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
@@ -483,10 +533,59 @@ const styles = StyleSheet.create({
   },
   buttonContent: { flexDirection: "row", alignItems: "center" },
   bookButtonText: { color: "white", fontSize: 18, fontWeight: "bold", marginRight: 10 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  calendarContainer: { backgroundColor: '#ffffff', borderRadius: 16, padding: 20, width: '90%', maxWidth: 400 },
-  closeButton: { marginTop: 16, padding: 12, backgroundColor: '#2a7fba', borderRadius: 8, alignItems: 'center' },
-  closeButtonText: { color: 'white', fontWeight: 'bold' },
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  calendarContainer: { 
+    backgroundColor: '#ffffff', 
+    borderRadius: 16, 
+    padding: 20, 
+    width: '90%', 
+    maxWidth: 400 
+  },
+  closeButton: { 
+    marginTop: 16, 
+    padding: 12, 
+    backgroundColor: '#2a7fba', 
+    borderRadius: 8, 
+    alignItems: 'center' 
+  },
+  closeButtonText: { 
+    color: 'white', 
+    fontWeight: 'bold' 
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666'
+  },
+  errorContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  errorText: {
+    marginTop: 10,
+    color: '#F44336',
+    textAlign: 'center'
+  },
+  retryButton: {
+    marginTop: 15,
+    padding: 10,
+    backgroundColor: '#2a7fba',
+    borderRadius: 5
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold'
+  }
 });
 
 export default DateTimeForm;

@@ -67,17 +67,65 @@ export async function doctorBookingView(customer_id, equipment_id, booking_date,
     // Use the passed customer_id if provided, otherwise use the one from AsyncStorage
     const effectiveCustomerId = customer_id || customerIdNumber;
 
-    let data = {
-      "booking_data": {
-        "customer_id": effectiveCustomerId,
-        "equipment_id": equipment_id,
-        "booking_date": booking_date, // e.g., "08-04-2025"
-        "start_time": start_time,     // e.g., "10:30 am"
-        "end_time": end_time,         // e.g., "11:30 am"
-        "duration": duration,         // e.g., 1.0
-        "call_mode": "ADD_BOOKING",
-        "remarks": "add booking"
+    // Function to convert time to 24-hour format with AM/PM suffix
+    const to24HourFormat = (time) => {
+      // Remove any existing "am/pm" and trim whitespace
+      let cleanTime = time.replace(/(am|pm)/i, "").trim();
+      
+      // Split into hours and minutes
+      const [hoursStr, minutes] = cleanTime.split(":").map((part) => part.trim());
+      let hours = parseInt(hoursStr, 10);
+
+      // Determine if the time is AM or PM
+      const isPm = /pm/i.test(time);
+      const isAm = /am/i.test(time);
+
+      // Convert to 24-hour format
+      let period = "am";
+      if (isPm && hours !== 12) {
+        hours += 12; // Convert PM hours (except 12 PM)
+        period = "pm";
+      } else if (isAm && hours === 12) {
+        hours = 0; // Convert 12 AM to 00
+        period = "am";
+      } else if (isPm && hours === 12) {
+        period = "pm"; // 12 PM stays 12
+      } else if (isAm && hours !== 12) {
+        period = "am"; // AM hours stay as is
+      } else if (!isAm && !isPm) {
+        // If no AM/PM is provided, assume 24-hour format and determine period
+        if (hours < 0 || hours > 23) {
+          throw new Error(`Invalid hour in time: ${time}`);
+        }
+        if (hours >= 12) {
+          period = "pm"; // 12:00–23:59 is PM
+        } else {
+          period = "am"; // 00:00–11:59 is AM
+        }
       }
+
+      // Format the time as HH:MM with AM/PM suffix
+      return `${hours.toString().padStart(2, "0")}:${minutes.padStart(2, "0")} ${period}`;
+    };
+
+    // Convert start_time and end_time to 24-hour format with AM/PM
+    const formattedStartTime = to24HourFormat(start_time);
+    const formattedEndTime = to24HourFormat(end_time);
+
+    console.log("Start Time:", formattedStartTime);
+    console.log("End Time:", formattedEndTime);
+
+    let data = {
+      booking_data: {
+        customer_id: effectiveCustomerId,
+        equipment_id: equipment_id,
+        booking_date: booking_date, // e.g., "08-04-2025"
+        start_time: formattedStartTime, // e.g., "10:30 am" or "14:30 pm"
+        end_time: formattedEndTime,     // e.g., "14:45 pm"
+        duration: duration,            // e.g., 1.0
+        call_mode: "ADD_BOOKING",
+        remarks: "add booking",
+      },
     };
 
     return await authAxiosPost(doctorbooking, data);
@@ -86,7 +134,6 @@ export async function doctorBookingView(customer_id, equipment_id, booking_date,
     throw error; // Re-throw the error to be handled by the caller
   }
 }
-
 export function getEmpClaim(res) {
   let data = {
     'call_mode': res
@@ -146,10 +193,13 @@ export async function setuserpinview(o_pin, n_pin) {
       n_pin: n_pin,
       user_type: "CUSTOMER",
     };
-
-    console.log("Sending request to API with data:", data);
+    // console.log("Sending request to API with data:", data);
+    if (response) {  // You might want to check response.status === 200 or similar depending on your API
+      await AsyncStorage.setItem("Password", n_pin);
+      await AsyncStorage.setItem("userPin", n_pin);
+    }
     const response = await authAxiosPost(setuserpin, data);
-    console.log("API Response:", response);
+    // console.log("API Response:", response);
     return response;
   } catch (error) {
     console.error("Error in setuserpinView:", error.response ? error.response.data : error.message);

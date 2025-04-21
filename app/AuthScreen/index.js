@@ -55,54 +55,15 @@ const LoginScreen = () => {
       return;
     }
     let finalUsername = username;
-
-    // // Check if username contains "@" (assuming it's an email)
-    // if (!username.includes("@")) {
-    //   try {
-    //     // First API call to get the username if it's not an email
-    //     const userDetailResponse = await axios.get(
-    //       `https://www.atomwalk.com/api/get_user_detail/?user_id=${username}`
-    //     );
-    //     if (userDetailResponse.status === 200) {
-    //       finalUsername = userDetailResponse.data.username;
-    //     } else {
-    //       setErrorMessage("User not found");
-    //       return;
-    //     }
-    //   } catch (error) {
-    //     console.error("Error fetching username:", error);
-    //     setErrorMessage("Failed to retrieve user details");
-    //     return;
-    //   }
-    // }
-
-    // Proceed with the login using the final username
     try {
       const response = await customerLogin(finalUsername,password);
-
       if (response.status === 200) {
         AsyncStorage.setItem("Password", password);
         AsyncStorage.setItem("username", finalUsername);
-  
-        // getCompanyInfo()
-        //   .then((res) => {
-        //     let comanyInfo = res.data;
-        //     AsyncStorage.setItem("companyInfo", JSON.stringify(comanyInfo));
-        //     let db_name = comanyInfo.db_name.substr(3);
-        //     AsyncStorage.setItem("dbName", db_name);
-        //     console.log(res.data.db_name, db_name, "alldata--->");
-        //   })
-        //   .catch((error) => {
-        //     console.log("ERROR", { error }, error.message);
-        //   });
-
         const userToken = response.data?.token;
         const Customer_id = response.data?.customer_id;
-         // Assuming the token is in the response data
-        // Store the token in AsyncStorage
         await AsyncStorage.setItem("Customer_id", Customer_id.toString());
         await AsyncStorage.setItem("userToken", userToken);
-        // Navigate to the home screen
         router.push("/home");
       } else {
         setErrorMessage("Invalid User id or Password");

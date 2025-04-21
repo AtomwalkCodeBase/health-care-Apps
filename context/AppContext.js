@@ -7,6 +7,7 @@ import {getCompanyInfo} from '../src/services/authServices'
 import { Alert } from 'react-native'
 import axios from "axios";
 import { useRouter } from 'expo-router';
+import { customerLogin } from '../src/services/productServices';
 
 // import { useRoute } from '@react-navigation/native';
 
@@ -25,81 +26,28 @@ const AppProvider = ({ children }) => {
     const router=useRouter();
 
     const login = async(username, password) => {
+      let tokens=`bf4401f70476590e194d2ed625f227f9532392c2`;
+    await AsyncStorage.setItem("userToken", tokens);
         setIsLoading(true);
-        let isError = false;
-
-        if (!username.includes("@")) {
-            try {
-              // First API call to get the username if it's not an email
-              const userDetailResponse = await axios.get(
-                `https://www.atomwalk.com/api/get_user_detail/?user_id=${username}`
-              );
-      
-              username = userDetailResponse.data.username;
-      
-              // if (userDetailResponse.status === 200) {
-              //   finalUsername = userDetailResponse.data.username;
-              // } else {
-              //   handleError("User not found for nick name");
-              //   return;
-              // }
-            } catch (error) {
-            //   console.log("Error fetching username:", error);
-              Alert.alert(
-                '❌ User not found for nick name', // Adding a cross icon using emoji
-                '', // Empty message (if needed)
-                [{ text: 'OK', onPress: () => console.log('OK Pressed') }],
-                { cancelable: true }
-              );
-              // handleError("Failed to retrieve user details");
-              isError = true
-              setIsLoading(false);
-              return
-            
-            }
-        }
-        // console.log(username, loginURL);
+        let finalUsername = username;
         try {
-            const res = await publicAxiosRequest.post(loginURL, {
-                username: username,
-                password: password,
-            });
-            const userToken = res.data['key']
-            console.log('After call', res.data, userToken)
-            AsyncStorage.setItem('userToken', userToken);
-            AsyncStorage.setItem('Password', password);
-            AsyncStorage.setItem('username', username);
-            setUserToken(userToken)
-            setError('')
-            router.replace({pathname: 'home' });
-            // console.log('TOKEN', getData())
-        } catch (err) {
-            isError = true
-            // console.log('Login', err)
-            setError(`Unable to Authenticate : ${err}`)
-            Alert.alert(
-                '❌ Incorrect E-mail ID or password', // Adding a cross icon using emoji
-                '', // Empty message (if needed)
-                [{ text: 'OK', onPress: () => console.log('OK Pressed') }],
-                { cancelable: true }
-              );
+          const response = await customerLogin(finalUsername,password);
+          if (response.status === 200) {
+            AsyncStorage.setItem("Password", password);
+            AsyncStorage.setItem("username", finalUsername);
+            const userToken = response.data?.token;
+            const Customer_id = response.data?.customer_id;
+            await AsyncStorage.setItem("Customer_id", Customer_id.toString());
+            await AsyncStorage.setItem("userToken", userToken);
+            router.push("/home");
+          } else {
+            alert("Invalid User id or Password");
+          }
+        } catch (error) {
+          console.error("API call error:", error);
+          setErrorMessage("Invalid User id or Password");
         }
-
-        if (!isError){
-            getCompanyInfo().then((res) => {
-                let comanyInfo = res.data; 
-                AsyncStorage.setItem('companyInfo', JSON.stringify(comanyInfo));
-                let db_name = comanyInfo.db_name.substr(3)
-                AsyncStorage.setItem('dbName', db_name);
-                setCompanyInfo(comanyInfo);
-                setDbName(db_name);
-                // console.log(res.data.db_name, db_name);  
-                
-            })
-            .catch((error) => {
-                    console.log('ERROR', {error}, error.message);
-            });
-        }
+    
         
         setIsLoading(false);
     }

@@ -8,11 +8,12 @@ import {
   ScrollView,
   Modal,
   Dimensions,
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
-import CustomModal from '../components/CustomModal';
 import * as Calendar from 'expo-calendar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getbookedlistview } from "../services/productServices";
@@ -30,13 +31,12 @@ const COLORS = {
   background: '#F5F7FF',
 };
 
-export const initialAppointmentsData = {
+let appointmentsState = {
   upcoming: [],
   past: [],
   cancelled: [],
 };
 
-let appointmentsState = { ...initialAppointmentsData };
 const listeners = new Set();
 
 export const getAppointments = () => appointmentsState;
@@ -52,83 +52,67 @@ const notifyListeners = () => {
 
 const normalizeTime = (startTime, endTime) => {
   if (!startTime || !endTime) return `${startTime || ''}-${endTime || ''}`;
+  
   const formatTime = (time) => {
     if (time.includes('AM') || time.includes('PM')) return time;
     const [hours, minutes] = time.split(':').map(Number);
     const period = hours >= 12 && hours < 24 ? 'PM' : 'AM';
     const normalizedHours = hours % 12 || 12;
-    return `${normalizedHours}:${minutes < 10 ? '0' + minutes : minutes}${period}`;
+    return `${normalizedHours}:${minutes.toString().padStart(2, '0')}${period}`;
   };
-  return `${formatTime(startTime)}-${formatTime(endTime)}`;
+  
+  return `${formatTime(startTime)} - ${formatTime(endTime)}`;
 };
 
 const formatDate = (dateString) => {
-  if (!dateString || typeof dateString !== 'string') return "Invalid Date";
+  if (!dateString) return "Invalid Date";
 
-  if (dateString.includes(',')) return dateString;
-
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-  let day, month, year;
-
+  // Handle "dd-mm-yyyy" format
   if (dateString.includes('-')) {
-    [day, month, year] = dateString.split('-').map(Number);
-    if (!day || !month || !year || isNaN(day) || isNaN(month) || isNaN(year)) {
-      console.error("Invalid date format (dd-mm-yyyy):", dateString);
-      return dateString;
-    }
-  } else if (dateString.includes(' ')) {
-    const [dayName, dayNum] = dateString.split(' ');
-    day = parseInt(dayNum);
-    const currentYear = new Date().getFullYear();
-    year = currentYear;
-    month = new Date().getMonth() + 1;
-    if (!day || isNaN(day)) {
-      console.error("Invalid date format (Day dd):", dateString);
-      return dateString;
-    }
-  } else {
-    console.error("Unrecognized date format:", dateString);
-    return dateString;
+    const [day, month, year] = dateString.split('-').map(Number);
+    if (!day || !month || !year) return dateString;
+    
+    const date = new Date(year, month - 1, day);
+    if (isNaN(date.getTime())) return dateString;
+    
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    return `${days[date.getDay()]}, ${day.toString().padStart(2, '0')} ${months[date.getMonth()]} ${year}`;
   }
 
-  const date = new Date(year, month - 1, day);
-  if (isNaN(date.getTime())) {
-    console.error("Invalid date:", dateString);
-    return dateString;
-  }
-
-  const dayIndex = date.getDay();
-  const formattedDay = String(day).padStart(2, '0');
-  const monthIndex = date.getMonth();
-  return `${days[dayIndex]}, ${formattedDay} ${months[monthIndex]} ${year}`;
+  return dateString;
 };
 
 const parseFullDate = (dateStr) => {
-  if (!dateStr || typeof dateStr !== 'string') {
-    console.warn("Invalid or missing date string:", dateStr);
+  if (!dateStr) return null;
+  
+  try {
+    // Handle "dd-mm-yyyy" format
+    if (dateStr.includes('-')) {
+      const [day, month, year] = dateStr.split('-').map(Number);
+      if (day && month && year) {
+        return new Date(year, month - 1, day);
+      }
+    }
+    
+    // Handle "Day, dd Month yyyy" format
+    if (dateStr.includes(',')) {
+      const [, rest] = dateStr.split(', ');
+      const [day, monthName, year] = rest.split(' ');
+      const months = ["January", "February", "March", "April", "May", "June", 
+                     "July", "August", "September", "October", "November", "December"];
+      const monthIndex = months.indexOf(monthName);
+      if (monthIndex !== -1 && day && year) {
+        return new Date(year, monthIndex, parseInt(day));
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error parsing date:', dateStr, error);
     return null;
   }
-  if (dateStr.includes('-')) {
-    const [day, month, year] = dateStr.split('-').map(Number);
-    if (!day || !month || !year) return null;
-    return new Date(year, month - 1, day);
-  }
-  if (dateStr.includes(',')) {
-    const [dayName, rest] = dateStr.split(", ");
-    if (!rest) return null;
-    const [day, monthName, year] = rest.split(" ");
-    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    const monthIndex = months.indexOf(monthName);
-    if (monthIndex === -1) return null;
-    return new Date(year, monthIndex, parseInt(day));
-  }
-  const [dayName, day] = dateStr.split(" ");
-  if (!day) return null;
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth();
-  return new Date(currentYear, currentMonth, parseInt(day));
 };
 
 const parseDateTime = (dateString, timeString) => {
@@ -146,9 +130,6 @@ const parseDateTime = (dateString, timeString) => {
   if (period) {
     if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
     if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
-  } else {
-    if (hours >= 12 && hours < 24) hours = hours;
-    else if (hours < 12) hours = hours;
   }
 
   date.setHours(hours, minutes, 0, 0);
@@ -237,58 +218,65 @@ export const fetchBookedAppointments = async () => {
     if (!customerId) {
       throw new Error("Customer ID not found. Please log in.");
     }
-    const customerIdNumber = parseInt(customerId, 10);
-    const response = await getbookedlistview(customerIdNumber);
+    
+    const response = await getbookedlistview(parseInt(customerId));
     console.log("API Response:", JSON.stringify(response, null, 2));
 
-    const storedBookings = await AsyncStorage.getItem('bookings');
-    const localBookings = storedBookings ? JSON.parse(storedBookings) : [];
-
-    let apiAppointments = [];
-    if (response && response.data) {
-      apiAppointments = response.data
-        .filter(booking => booking?.booking_date)
-        .map(booking => ({
-          id: booking?.equipment_data?.id?.toString() || `${Date.now()}-${Math.random()}`,
-          doctorName: booking.equipment_data?.name || 'Unknown Doctor',
-          specialty: booking.equipment_data?.equipment_type || 'Unknown Specialty',
-          date: booking.booking_date,
-          time: normalizeTime(booking?.start_time, booking?.end_time),
-          image: booking.equipment_data?.image || "https://randomuser.me/api/portraits/men/1.jpg",
-          status: booking?.status_display || 'upcoming'
-        }));
+    // Handle different response structures
+    const apiData = response.data || response;
+    
+    if (!apiData) {
+      throw new Error("No data received from API");
     }
 
-    const allBookingsMap = new Map();
-    localBookings
-      .filter(b => b.date && b.time)
-      .forEach(booking => allBookingsMap.set(booking.id, booking));
-    apiAppointments.forEach(apiBooking => {
-      if (!allBookingsMap.has(apiBooking.id)) {
-        allBookingsMap.set(apiBooking.id, apiBooking);
-      }
-    });
+    // Convert array-like response to array if needed
+    const bookingsArray = Array.isArray(apiData) ? apiData : [apiData];
 
-    const allBookings = Array.from(allBookingsMap.values());
     const currentDate = new Date();
     currentDate.setHours(0, 0, 0, 0);
 
-    const updatedAppointments = {
-      upcoming: allBookings.filter(b => {
-        const bookingDate = parseFullDate(b.date);
-        return bookingDate && (b.status === 'upcoming' || b.status === 'BOOKED') && bookingDate >= currentDate;
-      }),
-      past: allBookings.filter(b => {
-        const bookingDate = parseFullDate(b.date);
-        return bookingDate && (b.status === 'upcoming' || b.status === 'BOOKED') && bookingDate < currentDate;
-      }),
-      cancelled: allBookings.filter(b => b.status === 'cancelled' && parseFullDate(b.date))
+    const appointments = {
+      upcoming: [],
+      past: [],
+      cancelled: []
     };
 
-    appointmentsState = updatedAppointments;
+    bookingsArray.forEach(booking => {
+      if (!booking) return;
+      
+      const bookingDate = parseFullDate(booking.booking_date);
+      const status = booking.status_display || 'upcoming';
+      
+      const appointment = {
+        id: booking.id?.toString() || `${Date.now()}-${Math.random()}`,
+        doctorName: booking.equipment_data?.name || 'Unknown Equipment',
+        specialty: booking.equipment_data?.equipment_type || 'Unknown Type',
+        date: booking.booking_date || new Date().toISOString(),
+        time: normalizeTime(booking.start_time, booking.end_time),
+        image: booking.equipment_data?.image || "https://via.placeholder.com/100",
+        status: status.toLowerCase()
+      };
+
+      if (status.toLowerCase() === 'cancelled') {
+        appointments.cancelled.push(appointment);
+      } else if (bookingDate && bookingDate < currentDate) {
+        appointments.past.push(appointment);
+      } else {
+        appointments.upcoming.push(appointment);
+      }
+    });
+
+    appointmentsState = appointments;
     notifyListeners();
-    await AsyncStorage.setItem('bookings', JSON.stringify(allBookings));
-    return updatedAppointments;
+    
+    // Save to AsyncStorage for offline access
+    await AsyncStorage.setItem('bookings', JSON.stringify([
+      ...appointments.upcoming,
+      ...appointments.past,
+      ...appointments.cancelled
+    ]));
+    
+    return appointments;
   } catch (error) {
     console.error('Error fetching booked appointments:', error);
     return { upcoming: [], past: [], cancelled: [] };
@@ -296,20 +284,32 @@ export const fetchBookedAppointments = async () => {
 };
 
 export const useAppointments = () => {
-  const [appointments, setAppointments] = useState(initialAppointmentsData);
+  const [appointments, setAppointments] = useState(appointmentsState);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const loadAppointments = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    const fetchedAppointments = await fetchBookedAppointments();
-    setAppointments(fetchedAppointments);
-    setLoading(false);
+    try {
+      setLoading(true);
+      setError(null);
+      const fetchedAppointments = await fetchBookedAppointments();
+      setAppointments(fetchedAppointments);
+    } catch (err) {
+      setError(err.message);
+      console.error('Error loading appointments:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     loadAppointments();
+    
+    const unsubscribe = subscribeToAppointments((updatedAppointments) => {
+      setAppointments(updatedAppointments);
+    });
+    
+    return () => unsubscribe();
   }, [loadAppointments]);
 
   const saveAppointmentsToStorage = useCallback(async (updatedAppointments) => {
@@ -332,15 +332,73 @@ export const useAppointments = () => {
     const updatedAppointments = {
       ...appointmentsState,
       upcoming: appointmentsState.upcoming.filter(a => a.id !== appointmentId),
-      cancelled: [...appointmentsState.cancelled, { ...appointmentToCancel, status: 'cancelled', cancellationDate: new Date().toISOString() }]
+      cancelled: [...appointmentsState.cancelled, { ...appointmentToCancel, status: 'cancelled' }]
     };
+    
     appointmentsState = updatedAppointments;
     setAppointments(updatedAppointments);
     saveAppointmentsToStorage(updatedAppointments);
     notifyListeners();
   }, [saveAppointmentsToStorage]);
 
-  return { appointments, setAppointments, moveToCancelled, fetchBookedAppointments, loading, error };
+  return { 
+    appointments, 
+    loading, 
+    error, 
+    refresh: loadAppointments,
+    moveToCancelled 
+  };
+};
+
+const CustomModal = ({ 
+  isModalVisible, 
+  onpressyes, 
+  onpresno, 
+  cancelclick, 
+  movetocancel,
+  rescheduleClick 
+}) => {
+  return (
+    <Modal
+      visible={isModalVisible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onpresno}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <Ionicons 
+            name="warning-outline" 
+            size={50} 
+            color={COLORS.warning} 
+            style={styles.successIcon} 
+          />
+          <Text style={styles.modalTitle}>
+            {cancelclick ? 'Cancel Appointment' : 'Reschedule Appointment'}
+          </Text>
+          <Text style={styles.modalText}>
+            {cancelclick 
+              ? 'Are you sure you want to cancel this appointment?'
+              : 'Do you want to reschedule this appointment?'}
+          </Text>
+          <View style={styles.modalButtonContainer}>
+            <TouchableOpacity 
+              style={[styles.modalButton, { backgroundColor: COLORS.primary }]} 
+              onPress={cancelclick ? movetocancel : onpressyes}
+            >
+              <Text style={styles.modalButtonText}>Yes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.modalButton, { backgroundColor: COLORS.danger }]} 
+              onPress={onpresno}
+            >
+              <Text style={styles.modalButtonText}>No</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 };
 
 export default function MyAppointments() {
@@ -352,7 +410,7 @@ export default function MyAppointments() {
   const [rescheduleClick, setRescheduleClick] = useState(false);
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
   const [calendarError, setCalendarError] = useState(null);
-  const { appointments, moveToCancelled, fetchBookedAppointments, loading, error } = useAppointments();
+  const { appointments, loading, error, refresh, moveToCancelled } = useAppointments();
   const router = useRouter();
   const scrollViewRef = useRef(null);
 
@@ -478,15 +536,24 @@ export default function MyAppointments() {
       style={[styles.tabContent, { width: SCREEN_WIDTH }]}
       contentContainerStyle={styles.tabContentContainer}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={refresh}
+          colors={[COLORS.primary]}
+        />
+      }
     >
-      {loading ? (
+      {loading && appointments[tabName].length === 0 ? (
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading appointments...</Text>
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
+          <Ionicons name="warning-outline" size={40} color={COLORS.danger} />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={fetchBookedAppointments} style={styles.retryButton}>
+          <TouchableOpacity onPress={refresh} style={styles.retryButton}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -512,9 +579,11 @@ export default function MyAppointments() {
             {tabName === 'past' && 'No past appointments'}
             {tabName === 'cancelled' && 'No cancelled appointments'}
           </Text>
-          <Text style={styles.emptySubtext}>
-            {tabName === 'upcoming' && 'Book an appointment to get started'}
-          </Text>
+          {tabName === 'upcoming' && (
+            <Text style={styles.emptySubtext}>
+              Book an appointment to get started
+            </Text>
+          )}
         </View>
       )}
     </ScrollView>
@@ -557,7 +626,7 @@ export default function MyAppointments() {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         onScroll={handleScroll}
-        scrollEventThrottle={16} // Ensures smooth scroll detection
+        scrollEventThrottle={16}
       >
         {renderTabContent('upcoming')}
         {renderTabContent('past')}
@@ -594,7 +663,10 @@ export default function MyAppointments() {
                 <Text style={styles.modalText}>Appointment has been successfully added to your calendar!</Text>
               </>
             )}
-            <TouchableOpacity style={styles.modalButton} onPress={() => setCalendarModalVisible(false)}>
+            <TouchableOpacity 
+              style={styles.modalButton} 
+              onPress={() => setCalendarModalVisible(false)}
+            >
               <Text style={styles.modalButtonText}>OK</Text>
             </TouchableOpacity>
           </View>
@@ -811,11 +883,19 @@ const styles = StyleSheet.create({
     textAlign: 'center', 
     marginBottom: 20 
   },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 20
+  },
   modalButton: { 
     backgroundColor: COLORS.primary, 
     paddingVertical: 10, 
     paddingHorizontal: 20, 
-    borderRadius: 8 
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center'
   },
   modalButtonText: { 
     color: COLORS.white, 
@@ -832,7 +912,8 @@ const styles = StyleSheet.create({
   },
   loadingText: { 
     fontSize: 16, 
-    color: COLORS.muted 
+    color: COLORS.muted,
+    marginTop: 10
   },
   errorContainer: { 
     flex: 1, 
@@ -844,7 +925,8 @@ const styles = StyleSheet.create({
     fontSize: 16, 
     color: COLORS.danger, 
     textAlign: 'center', 
-    marginBottom: 20 
+    marginBottom: 20,
+    marginTop: 10
   },
   retryButton: { 
     backgroundColor: COLORS.primary, 

@@ -68,8 +68,8 @@ const AuthScreen = () => {
     
         const correctMPIN = await AsyncStorage.getItem('userPin');
         const finalUsername = await AsyncStorage.getItem('username');
-        const userPassword = await AsyncStorage.getItem('Password');
-    
+        const userPassword = await AsyncStorage.getItem('userPin');
+    console.log(correctMPIN,finalUsername,userPassword)
         setTimeout(() => {
             if (mPIN.join('') === correctMPIN) {
                 setIsAuthenticated(true);
@@ -88,8 +88,8 @@ const AuthScreen = () => {
 
     const handleBiometricAuthentication = async () => {
         const finalUsername = await AsyncStorage.getItem('username');
-        const userPassword = await AsyncStorage.getItem('Password');
-
+        const userPassword = await AsyncStorage.getItem('userPin');
+console.log(finalUsername,userPassword)
         try {
             const biometricAuth = await LocalAuthentication.authenticateAsync({
                 promptMessage: 'Authenticate using biometrics',

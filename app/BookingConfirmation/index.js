@@ -19,8 +19,6 @@ const BookingConfirmation = () => {
   const formatDateForAPI = (dateString) => {
     if (!dateString) return "";
     const [dayAbbr, dayNum] = dateString.split(" ");
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const dayIndex = days.indexOf(dayAbbr);
     const selectedDate = new Date();
     selectedDate.setDate(parseInt(dayNum));
 
@@ -41,7 +39,7 @@ const BookingConfirmation = () => {
   const formatTimeForAPI = (timeStr) => {
     const cleanTime = timeStr.trim();
     const [time, period] = cleanTime.match(/(\d+:\d+)([AP]M)/i)?.slice(1) || [];
-    if (!time || !period) return cleanTime; // Fallback to original if parsing fails
+    if (!time || !period) return cleanTime;
     return `${time} ${period.toLowerCase()}`; // e.g., "10:30 am"
   };
 
@@ -58,32 +56,31 @@ const BookingConfirmation = () => {
 
     const start = parseTime(startTime);
     const end = parseTime(endTime);
-    if (!start || !end) return 1.0; // Fallback duration
+    if (!start || !end) return 1.0;
 
     const startTotalMinutes = start.hours * 60 + start.minutes;
     let endTotalMinutes = end.hours * 60 + end.minutes;
-    if (endTotalMinutes < startTotalMinutes) endTotalMinutes += 24 * 60; // Handle overnight
+    if (endTotalMinutes < startTotalMinutes) endTotalMinutes += 24 * 60;
     const durationMinutes = endTotalMinutes - startTotalMinutes;
-    return durationMinutes / 60; // Convert to hours
+    return durationMinutes / 60;
   };
 
   const formatDate = (dateString) => {
     if (!dateString || !params.fullDate) return "";
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const [dayAbbr, dayNum] = dateString.split(" ");
+    const [dayAbbr] = dateString.split(" ");
     const dayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(dayAbbr);
     
-    // Use fullDate from params instead of assuming current month
     const [year, month, day] = params.fullDate.split('-').map(Number);
-    const date = new Date(year, month - 1, day); // month - 1 because JS months are 0-indexed
+    const date = new Date(year, month - 1, day);
     
     const formattedDay = String(date.getDate()).padStart(2, '0');
     return `${days[dayIndex]}, ${formattedDay} ${months[date.getMonth()]} ${date.getFullYear()}`;
   };
 
   const parseDateTime = (formattedDate, timeString) => {
-    const [dayName, dayMonthYear] = formattedDate.split(', ');
+    const [, dayMonthYear] = formattedDate.split(', ');
     const [dayNum, monthName, year] = dayMonthYear.split(' ');
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const monthIndex = months.indexOf(monthName);
@@ -134,32 +131,6 @@ const BookingConfirmation = () => {
     }
   };
 
-  const storeBooking = async () => {
-    try {
-      const booking = {
-        id: Date.now().toString(),
-        doctorId: parseInt(params.doctorId),
-        doctorName: params.doctorName,
-        specialty: params.specialty,
-        date: params.date,
-        fullDate: formatDate(params.date),
-        time: params.time,
-        image: params.image,
-        status: 'upcoming',
-        bookingDate: new Date().toISOString(),
-      };
-      const existingBookings = await AsyncStorage.getItem('bookings');
-      const bookings = existingBookings ? JSON.parse(existingBookings) : [];
-      bookings.push(booking);
-      await AsyncStorage.setItem('bookings', JSON.stringify(bookings));
-      console.log("Booking saved to AsyncStorage successfully:", booking);
-      return true;
-    } catch (error) {
-      console.error('Error storing booking:', error);
-      return false;
-    }
-  };
-
   const handleConfirmBooking = () => {
     if (isSubmitting) return;
     setShowConfirmModal(true);
@@ -169,56 +140,38 @@ const BookingConfirmation = () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     setShowConfirmModal(false);
-
+  
     try {
       const [startTime, endTime] = params.time.split(" - ");
       const bookingDate = formatDateForAPI(params.date);
-      const formattedStartTime = formatTimeForAPI(startTime); // e.g., "10:30 am"
-      const formattedEndTime = formatTimeForAPI(endTime);     // e.g., "11:30 am"
+      const formattedStartTime = formatTimeForAPI(params.startTime); // Use the 24-hour version passed from DateTimeForm
+      const formattedEndTime = formatTimeForAPI(params.endTime);     // Use the 24-hour version passed from DateTimeForm
       const duration = calculateDuration(startTime, endTime);
-
-      if (!params.doctorId) {
-        throw new Error("Doctor ID is missing.");
-      }
-
+  
+      if (!params.doctorId) throw new Error("Doctor ID is missing.");
+  
       const customerId = await AsyncStorage.getItem("Customer_id");
-      if (!customerId) {
-        throw new Error("Customer ID not found in AsyncStorage.");
-      }
-
-      console.log("Booking Data:", {
-        customer_id: parseInt(customerId),
-        equipment_id: parseInt(params.doctorId),
-        booking_date: bookingDate,
-        start_time: formattedStartTime,
-        end_time: formattedEndTime,
-        duration: duration,
-      });
-
+      if (!customerId) throw new Error("Customer ID not found in AsyncStorage.");
+  
       const response = await doctorBookingView(
-        parseInt(customerId), // Pass explicitly instead of relying on function fallback
+        parseInt(customerId),
         parseInt(params.doctorId),
         bookingDate,
-        formattedStartTime,
-        formattedEndTime,
+        formattedStartTime, // Already in 24-hour format
+        formattedEndTime,   // Already in 24-hour format
         duration
       );
-
+  
       console.log("API Response:", JSON.stringify(response, null, 2));
-
+  
       if (response && (response.status === 200 || response.data?.success)) {
-        const success = await storeBooking();
-        if (success) {
-          setShowSuccessModal(true);
-        } else {
-          alert('Failed to save booking locally.');
-        }
+        setShowSuccessModal(true);
       } else {
-        alert('Booking failed. The slot may already be taken or an error occurred on the server.');
+        alert('Booking failed. The slot may already be taken or an error occurred.');
       }
     } catch (error) {
-      console.error('Error confirming booking:', error.response?.data || error.message || error);
-      alert(`An error occurred while booking: ${error.message || 'Server error (Status 500)'}`);
+      console.error('Error confirming booking:', error.response?.data || error.message);
+      alert(`An error occurred: ${error.message || 'Server error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -231,13 +184,12 @@ const BookingConfirmation = () => {
 
   const handleSuccessOk = () => {
     setShowSuccessModal(false);
-    setShowCalendarModal(false);
-    router.push("/home");
+    setShowCalendarModal(true); // Prompt for calendar after success
   };
 
   const handleCalendarCancel = () => {
     setShowCalendarModal(false);
-    router.push("/book");
+    router.push("/home");
   };
 
   const handleViewMyBook = () => {
