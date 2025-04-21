@@ -15,6 +15,7 @@ const BookingConfirmation = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isReschedule = params.isReschedule === 'true';
 
   const formatDateForAPI = (dateString) => {
     if (!dateString) return "";
@@ -56,7 +57,7 @@ const BookingConfirmation = () => {
 
     const start = parseTime(startTime);
     const end = parseTime(endTime);
-    if (!start || !end) return 1.0;
+    if (!start || !end) return parseFloat(params.duration) || 1.0;
 
     const startTotalMinutes = start.hours * 60 + start.minutes;
     let endTotalMinutes = end.hours * 60 + end.minutes;
@@ -144,11 +145,12 @@ const BookingConfirmation = () => {
     try {
       const [startTime, endTime] = params.time.split(" - ");
       const bookingDate = formatDateForAPI(params.date);
-      const formattedStartTime = formatTimeForAPI(params.startTime); // Use the 24-hour version passed from DateTimeForm
-      const formattedEndTime = formatTimeForAPI(params.endTime);     // Use the 24-hour version passed from DateTimeForm
+      const formattedStartTime = params.startTime; // Already in HH:mm format
+      const formattedEndTime = params.endTime;     // Already in HH:mm format
       const duration = calculateDuration(startTime, endTime);
   
       if (!params.doctorId) throw new Error("Doctor ID is missing.");
+      if (isReschedule && !params.booking_id) throw new Error("Booking ID is required for rescheduling.");
   
       const customerId = await AsyncStorage.getItem("Customer_id");
       if (!customerId) throw new Error("Customer ID not found in AsyncStorage.");
@@ -157,9 +159,11 @@ const BookingConfirmation = () => {
         parseInt(customerId),
         parseInt(params.doctorId),
         bookingDate,
-        formattedStartTime, // Already in 24-hour format
-        formattedEndTime,   // Already in 24-hour format
-        duration
+        formattedStartTime,
+        formattedEndTime,
+        duration,
+        isReschedule ? "UPDATE" : "ADD_BOOKING",
+        isReschedule ? params.booking_id : null
       );
   
       console.log("API Response:", JSON.stringify(response, null, 2));
@@ -167,11 +171,17 @@ const BookingConfirmation = () => {
       if (response && (response.status === 200 || response.data?.success)) {
         setShowSuccessModal(true);
       } else {
-        alert('Booking failed. The slot may already be taken or an error occurred.');
+        throw new Error('Operation failed. The slot may already be taken or an error occurred.');
       }
     } catch (error) {
-      console.error('Error confirming booking:', error.response?.data || error.message);
-      alert(`An error occurred: ${error.message || 'Server error'}`);
+      console.error(`Error ${isReschedule ? 'rescheduling' : 'booking'} appointment:`, error.response?.data || error.message);
+      let errorMessage = `An error occurred: ${error.message || 'Server error'}`;
+      if (error.response?.data?.message?.includes('Booking record not found')) {
+        errorMessage = `Booking ID ${params.booking_id} not found. It may have been cancelled or does not exist.`;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -204,7 +214,7 @@ const BookingConfirmation = () => {
     <View style={styles.container}>
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
       <Header
-        title="Confirm Booking"
+        title={isReschedule ? "Confirm Reschedule" : "Confirm Booking"}
         showBackButton
         onBackPress={() => router.back()}
       />
@@ -267,7 +277,9 @@ const BookingConfirmation = () => {
         onPress={handleConfirmBooking}
         disabled={isSubmitting}
       >
-        <Text style={styles.confirmButtonText}>Confirm Booking</Text>
+        <Text style={styles.confirmButtonText}>
+          {isReschedule ? "Confirm Reschedule" : "Confirm Booking"}
+        </Text>
         <Icon name="check-circle" size={20} color="white" style={styles.buttonIcon} />
       </TouchableOpacity>
       <Modal
@@ -278,9 +290,11 @@ const BookingConfirmation = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Confirm Booking?</Text>
+            <Text style={styles.modalTitle}>
+              {isReschedule ? "Confirm Reschedule?" : "Confirm Booking?"}
+            </Text>
             <Text style={styles.modalText}>
-              Are you sure you want to book this appointment?
+              Are you sure you want to {isReschedule ? "reschedule" : "book"} this appointment?
             </Text>
             <View style={styles.modalButtonContainer}>
               <TouchableOpacity style={styles.yesButton} onPress={handleConfirmYes} disabled={isSubmitting}>
@@ -302,7 +316,9 @@ const BookingConfirmation = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Icon name="check-circle" size={50} color="#4CAF50" style={styles.successIcon} />
-            <Text style={styles.modalTitle}>Appointment Booked</Text>
+            <Text style={styles.modalTitle}>
+              {isReschedule ? "Appointment Rescheduled" : "Appointment Booked"}
+            </Text>
             <View style={styles.modalTxt}>
               <Text style={styles.detailText}>Doctor: {params.doctorName}</Text>
               <Text style={styles.detailText}>Specialty: {params.specialty}</Text>

@@ -18,14 +18,36 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getbookedlistview } from "../services/productServices";
 import moment from 'moment-timezone';
 
+// Placeholder for getEquipmentData (replace with actual API if available)
+const getEquipmentData = async (equipmentId) => {
+  try {
+    const customerId = await AsyncStorage.getItem("Customer_id");
+    const response = await getbookedlistview(parseInt(customerId));
+    const booking = response?.data?.find(b => b.equipment_data?.id === parseInt(equipmentId));
+    if (!booking) throw new Error("Equipment not found");
+    return {
+      minUsagePeriod: parseFloat(booking.equipment_data.min_usage_period) || 1.0,
+      maxUsagePeriod: parseFloat(booking.equipment_data.max_usage_period) || 2.0,
+      unitOfUsage: booking.equipment_data.unit_of_usage || "HOUR",
+      numSlots: parseInt(booking.equipment_data.no_of_slots) || 8,
+      startTime: booking.equipment_data.start_time || "09:00",
+      maxSlotTime: booking.equipment_data.max_slot_time || "17:00",
+    };
+  } catch (error) {
+    console.error("Error fetching equipment data:", error);
+    throw error;
+  }
+};
+
 const DateTimeForm = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const TIMEZONE = 'Asia/Kolkata';
+  const isReschedule = params.isReschedule === 'true';
 
-  const doctor = {
+  const [doctor, setDoctor] = useState({
     id: params.id,
-    duration: params.duration,
+    duration: parseFloat(params.duration) || 1.0,
     name: params.name || "Unknown Doctor",
     specialty: params.specialty || "Unknown Specialty",
     image: params.image || "https://via.placeholder.com/100",
@@ -36,21 +58,23 @@ const DateTimeForm = () => {
     unitOfUsage: params.unitOfUsage || "HOUR",
     numSlots: parseInt(params.numSlots) || 8,
     maxSlotTime: params.maxSlotTime || "17:00",
-  };
+  });
 
-  const generateWeekDates = () => {
+  const generateWeekDates = (startDate) => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const today = moment().tz(TIMEZONE).startOf('day');
+    const baseDate = startDate ? moment.tz(startDate, 'DD-MM-YYYY', TIMEZONE) : today;
     
     return Array.from({ length: 7 }).map((_, i) => {
-      const date = today.clone().add(i, 'days');
+      const date = baseDate.clone().add(i, 'days');
       const dayName = days[date.day()];
       const dayNum = date.date();
       const month = months[date.month()];
       return {
         display: `${dayName} ${dayNum} ${month}`,
         fullDate: date.format('YYYY-MM-DD'),
+        formattedDate: date.format('DD-MM-YYYY'),
         dateObj: date.toDate()
       };
     });
@@ -59,7 +83,6 @@ const DateTimeForm = () => {
   const normalizeTime = (timeStr) => {
     if (!timeStr) return "";
     if (timeStr.includes('AM') || timeStr.includes('PM')) return timeStr;
-    
     return moment.tz(timeStr, 'HH:mm', TIMEZONE).format('h:mmA');
   };
 
@@ -89,15 +112,42 @@ const DateTimeForm = () => {
     return slots;
   };
 
-  const [dates, setDates] = useState(generateWeekDates());
-  const [selectedDate, setSelectedDate] = useState(dates[0].display);
-  const [selectedFullDate, setSelectedFullDate] = useState(dates[0].fullDate);
-  const [selectedTime, setSelectedTime] = useState(null);
+  const [dates, setDates] = useState(generateWeekDates(isReschedule ? params.date : null));
+  const [selectedDate, setSelectedDate] = useState(isReschedule ? dates.find(d => d.formattedDate === params.date)?.display || dates[0].display : dates[0].display);
+  const [selectedFullDate, setSelectedFullDate] = useState(isReschedule ? dates.find(d => d.formattedDate === params.date)?.fullDate || dates[0].fullDate : dates[0].fullDate);
+  const [selectedTime, setSelectedTime] = useState(isReschedule ? normalizeTime(params.startTime) : null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [timeSlots, setTimeSlots] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(true);
+  const [loadingEquipment, setLoadingEquipment] = useState(true);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const loadEquipmentData = async () => {
+      setLoadingEquipment(true);
+      try {
+        const equipmentData = await getEquipmentData(doctor.id);
+        setDoctor(prev => ({
+          ...prev,
+          startTime: equipmentData.startTime,
+          maxSlotTime: equipmentData.maxSlotTime,
+          minUsagePeriod: equipmentData.minUsagePeriod,
+          maxUsagePeriod: equipmentData.maxUsagePeriod,
+          unitOfUsage: equipmentData.unitOfUsage,
+          numSlots: equipmentData.numSlots,
+          duration: equipmentData.minUsagePeriod,
+        }));
+      } catch (err) {
+        console.error("Failed to load equipment data:", err);
+        setError("Failed to load doctor details. Using default settings.");
+      } finally {
+        setLoadingEquipment(false);
+      }
+    };
+
+    loadEquipmentData();
+  }, [doctor.id]);
 
   useEffect(() => {
     const loadBookings = async () => {
@@ -127,17 +177,21 @@ const DateTimeForm = () => {
             start: normalizeTime(booking.start_time),
             end: normalizeTime(booking.end_time),
             start24: booking.start_time,
-            end24: booking.end_time
+            end24: booking.end_time,
+            booking_id: booking.booking_id,
           })) || [];
 
         const updatedSlots = baseSlots.map(slot => {
-          const isBooked = bookedSlots.some(booking => 
-            booking.start24 === slot.start24 && booking.end24 === slot.end24
+          const bookedSlot = bookedSlots.find(b => 
+            b.start24 === slot.start24 && b.end24 === slot.end24
           );
-          return {
-            ...slot,
-            status: isBooked ? "Booked" : "Available"
-          };
+          if (bookedSlot) {
+            if (isReschedule && bookedSlot.booking_id === params.booking_id) {
+              return { ...slot, status: "Current" }; // Current booking
+            }
+            return { ...slot, status: "Booked" };
+          }
+          return slot;
         });
         
         setTimeSlots(updatedSlots);
@@ -150,8 +204,10 @@ const DateTimeForm = () => {
       }
     };
     
-    loadBookings();
-  }, [doctor.id, selectedFullDate]);
+    if (!loadingEquipment) {
+      loadBookings();
+    }
+  }, [doctor.id, selectedFullDate, doctor.startTime, doctor.minUsagePeriod, doctor.numSlots, doctor.maxSlotTime, loadingEquipment, isReschedule, params.booking_id]);
 
   const handleTimeSelection = (slot) => {
     if (slot.status === "Booked") return;
@@ -171,7 +227,8 @@ const DateTimeForm = () => {
       const date = selectedDate.clone().add(i, 'days');
       return {
         display: `${days[date.day()]} ${date.date()} ${months[date.month()]}`,
-        fullDate: date.format('YYYY-MM-DD')
+        fullDate: date.format('YYYY-MM-DD'),
+        formattedDate: date.format('DD-MM-YYYY'),
       };
     });
 
@@ -208,7 +265,9 @@ const DateTimeForm = () => {
       startTime: slot.start24,
       endTime: slot.end24,
       duration: doctor.minUsagePeriod,
-      timezone: TIMEZONE
+      timezone: TIMEZONE,
+      booking_id: isReschedule ? params.booking_id : undefined,
+      isReschedule: isReschedule,
     };
 
     router.push({
@@ -261,7 +320,7 @@ const DateTimeForm = () => {
   };
 
   const renderTimeSlots = () => {
-    if (loadingSlots) {
+    if (loadingSlots || loadingEquipment) {
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2a7fba" />
@@ -292,8 +351,9 @@ const DateTimeForm = () => {
             key={`${slot.start}-${index}`}
             style={[
               styles.timeSlot,
-              selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeSlot,
+              selectedTime === slot.start && slot.status !== "Booked" && styles.selectedTimeSlot,
               slot.status === "Booked" && styles.bookedTimeSlot,
+              slot.status === "Current" && styles.currentTimeSlot,
             ]}
             onPress={() => handleTimeSelection(slot)}
             disabled={slot.status === "Booked"}
@@ -301,8 +361,9 @@ const DateTimeForm = () => {
             <Text
               style={[
                 styles.timeRangeText,
-                selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeText,
+                selectedTime === slot.start && slot.status !== "Booked" && styles.selectedTimeText,
                 slot.status === "Booked" && styles.bookedTimeText,
+                slot.status === "Current" && styles.currentTimeText,
               ]}
             >
               {`${slot.start} - ${slot.end}`}
@@ -310,7 +371,9 @@ const DateTimeForm = () => {
             <View
               style={[
                 styles.statusBadge,
-                slot.status === "Available" ? styles.availableBadge : styles.bookedBadge
+                slot.status === "Available" ? styles.availableBadge :
+                slot.status === "Current" ? styles.currentBadge :
+                styles.bookedBadge
               ]}
             >
               <Text style={styles.statusText}>
@@ -326,7 +389,7 @@ const DateTimeForm = () => {
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
-      <Header title="Book an Appointment" />
+      <Header title={isReschedule ? "Reschedule Appointment" : "Book an Appointment"} />
       
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.profileCard}>
@@ -376,7 +439,9 @@ const DateTimeForm = () => {
           <ActivityIndicator color="white" />
         ) : (
           <View style={styles.buttonContent}>
-            <Text style={styles.bookButtonText}>Select Appointment</Text>
+            <Text style={styles.bookButtonText}>
+              {isReschedule ? "Select New Time" : "Select Appointment"}
+            </Text>
             <Icon name="check-circle" size={20} color="white" />
           </View>
         )}
@@ -506,6 +571,7 @@ const styles = StyleSheet.create({
   },
   selectedTimeSlot: { backgroundColor: "#2a7fba", borderColor: "#2a7fba" },
   bookedTimeSlot: { backgroundColor: "#EAEAEA", borderColor: "#e0e0e0" },
+  currentTimeSlot: { backgroundColor: "#FFF3E0", borderColor: "#FFB300" },
   timeRangeText: {
     fontSize: 14,
     color: "#666",
@@ -515,9 +581,11 @@ const styles = StyleSheet.create({
   },
   selectedTimeText: { color: "#ffffff" },
   bookedTimeText: { color: "#999" },
+  currentTimeText: { color: "#FFB300" },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginTop: 4 },
   availableBadge: { backgroundColor: "#E8F5E9" },
   bookedBadge: { backgroundColor: "#DBDBDB" },
+  currentBadge: { backgroundColor: "#FFF3E0" },
   statusText: { fontSize: 12, fontWeight: "500", color: "#2c3e50" },
   bookButton: {
     position: "absolute",

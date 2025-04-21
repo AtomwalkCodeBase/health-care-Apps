@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Header from '../components/Header';
 import * as Calendar from 'expo-calendar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getbookedlistview } from "../services/productServices";
+import { getbookedlistview, doctorBookingView } from "../services/productServices";
 
 const COLORS = {
   primary: '#2196F3',
@@ -56,7 +56,7 @@ const normalizeTime = (startTime, endTime) => {
   const formatTime = (time) => {
     if (time.includes('AM') || time.includes('PM')) return time;
     const [hours, minutes] = time.split(':').map(Number);
-    const period = hours >= 12 && hours < 24 ? 'PM' : 'AM';
+    const period = hours >= 12 ? 'PM' : 'AM';
     const normalizedHours = hours % 12 || 12;
     return `${normalizedHours}:${minutes.toString().padStart(2, '0')}${period}`;
   };
@@ -67,7 +67,6 @@ const normalizeTime = (startTime, endTime) => {
 const formatDate = (dateString) => {
   if (!dateString) return "Invalid Date";
 
-  // Handle "dd-mm-yyyy" format
   if (dateString.includes('-')) {
     const [day, month, year] = dateString.split('-').map(Number);
     if (!day || !month || !year) return dateString;
@@ -88,7 +87,6 @@ const parseFullDate = (dateStr) => {
   if (!dateStr) return null;
   
   try {
-    // Handle "dd-mm-yyyy" format
     if (dateStr.includes('-')) {
       const [day, month, year] = dateStr.split('-').map(Number);
       if (day && month && year) {
@@ -96,7 +94,6 @@ const parseFullDate = (dateStr) => {
       }
     }
     
-    // Handle "Day, dd Month yyyy" format
     if (dateStr.includes(',')) {
       const [, rest] = dateStr.split(', ');
       const [day, monthName, year] = rest.split(' ');
@@ -220,16 +217,14 @@ export const fetchBookedAppointments = async () => {
     }
     
     const response = await getbookedlistview(parseInt(customerId));
-    console.log("API Response:", JSON.stringify(response, null, 2));
+    console.log("getbookedlistview Response:", JSON.stringify(response, null, 2));
 
-    // Handle different response structures
     const apiData = response.data || response;
     
     if (!apiData) {
       throw new Error("No data received from API");
     }
 
-    // Convert array-like response to array if needed
     const bookingsArray = Array.isArray(apiData) ? apiData : [apiData];
 
     const currentDate = new Date();
@@ -249,13 +244,23 @@ export const fetchBookedAppointments = async () => {
       
       const appointment = {
         id: booking.id?.toString() || `${Date.now()}-${Math.random()}`,
+        booking_id: booking.booking_id?.toString() || booking.id?.toString(), // Use booking_id, fallback to id
         doctorName: booking.equipment_data?.name || 'Unknown Equipment',
         specialty: booking.equipment_data?.equipment_type || 'Unknown Type',
         date: booking.booking_date || new Date().toISOString(),
         time: normalizeTime(booking.start_time, booking.end_time),
         image: booking.equipment_data?.image || "https://via.placeholder.com/100",
-        status: status.toLowerCase()
+        status: status.toLowerCase(),
+        start_time: booking.start_time,
+        end_time: booking.end_time,
+        duration: booking.duration,
+        equipment_id: booking.equipment_data?.id?.toString(),
       };
+
+      if (!appointment.booking_id) {
+        console.warn('Skipping booking with missing booking_id:', booking);
+        return;
+      }
 
       if (status.toLowerCase() === 'cancelled') {
         appointments.cancelled.push(appointment);
@@ -269,7 +274,6 @@ export const fetchBookedAppointments = async () => {
     appointmentsState = appointments;
     notifyListeners();
     
-    // Save to AsyncStorage for offline access
     await AsyncStorage.setItem('bookings', JSON.stringify([
       ...appointments.upcoming,
       ...appointments.past,
@@ -409,6 +413,7 @@ export default function MyAppointments() {
   const [cancelClick, setCancelClick] = useState(false);
   const [rescheduleClick, setRescheduleClick] = useState(false);
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
+  const [cancelSuccessModalVisible, setCancelSuccessModalVisible] = useState(false);
   const [calendarError, setCalendarError] = useState(null);
   const { appointments, loading, error, refresh, moveToCancelled } = useAppointments();
   const router = useRouter();
@@ -437,12 +442,86 @@ export default function MyAppointments() {
     }
   };
 
-  const moveToCancel = () => {
-    moveToCancelled(data);
-    setModalVisible(false);
-    setCancelClick(false);
-    setActiveTab('cancelled');
-    scrollToTab('cancelled');
+  const moveToCancel = async () => {
+    const appointment = appointments.upcoming.find(a => a.id === data);
+    if (!appointment) {
+      alert('Appointment not found.');
+      setModalVisible(false);
+      setCancelClick(false);
+      return;
+    }
+
+    try {
+      const customerId = await AsyncStorage.getItem("Customer_id");
+      if (!customerId) throw new Error("Customer ID not found. Please log in.");
+
+      // Validate required fields
+      if (!appointment.booking_id) {
+        throw new Error(`Invalid Booking ID for appointment: ${appointment.id}`);
+      }
+      if (!appointment.equipment_id) throw new Error("Equipment ID is missing.");
+      if (!appointment.date) throw new Error("Booking date is missing.");
+      if (!appointment.start_time || !appointment.end_time) {
+        throw new Error("Start time or end time is missing.");
+      }
+      if (!appointment.duration) throw new Error("Duration is missing.");
+
+      // Validate booking_id format (optional, based on expected format like B_YYYYMMDD_NNNN)
+      if (!appointment.booking_id.match(/^B_\d{8}_\d+$/)) {
+        throw new Error(`Invalid Booking ID format: ${appointment.booking_id}. Expected format like B_YYYYMMDD_NNNN.`);
+      }
+
+      console.log("Cancelling Appointment:", {
+        customer_id: parseInt(customerId),
+        equipment_id: parseInt(appointment.equipment_id),
+        booking_date: appointment.date,
+        start_time: appointment.start_time,
+        end_time: appointment.end_time,
+        duration: appointment.duration,
+        call_mode: "CANCEL",
+        booking_id: appointment.booking_id
+      });
+
+      const response = await doctorBookingView(
+        parseInt(customerId),
+        parseInt(appointment.equipment_id),
+        appointment.date,
+        appointment.start_time,
+        appointment.end_time,
+        appointment.duration,
+        "CANCEL",
+        appointment.booking_id
+      );
+
+      if (response && (response.status === 200 || response.data?.success)) {
+        moveToCancelled(data);
+        setModalVisible(false);
+        setCancelClick(false);
+        setActiveTab('cancelled');
+        scrollToTab('cancelled');
+        setCancelSuccessModalVisible(true); // Show success modal
+      } else {
+        throw new Error('Failed to cancel the appointment. Unexpected response.');
+      }
+    } catch (error) {
+      console.error('Error cancelling appointment:', error);
+      let errorMessage = 'Failed to cancel appointment. Please try again.';
+      if (error.response) {
+        console.error('Server Error Response:', JSON.stringify(error.response.data, null, 2));
+        if (error.response.data.message.includes('Booking record not found')) {
+          errorMessage = `Booking ID ${appointment.booking_id} not found. It may have been cancelled or does not exist.`;
+          // Refresh appointments to sync with server
+          await refresh();
+        } else {
+          errorMessage = error.response.data.message || errorMessage;
+        }
+      } else {
+        errorMessage = error.message;
+      }
+      alert(errorMessage);
+      setModalVisible(false);
+      setCancelClick(false);
+    }
   };
 
   const onPressYes = () => {
@@ -452,10 +531,16 @@ export default function MyAppointments() {
         router.push({
           pathname: "/DateTime",
           params: {
-            appointmentId: appointment.id,
+            booking_id: appointment.booking_id,
+            id: appointment.equipment_id,
             name: appointment.doctorName,
             specialty: appointment.specialty,
             image: appointment.image,
+            startTime: appointment.start_time,
+            endTime: appointment.end_time,
+            duration: appointment.duration,
+            date: appointment.date,
+            time: appointment.time,
             isReschedule: true,
           },
         });
@@ -571,7 +656,7 @@ export default function MyAppointments() {
         ))
       ) : (
         <View style={styles.emptyContainer}>
-          <View style={styles.emptyIllustration}>
+          <View style={styles.emptyIcon}>
             <Ionicons name="calendar-outline" size={80} color={COLORS.primary} />
           </View>
           <Text style={styles.noAppointmentsText}>
@@ -650,24 +735,51 @@ export default function MyAppointments() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            {calendarError ? (
-              <>
-                <Ionicons name="warning" size={50} color={COLORS.danger} style={styles.successIcon} />
-                <Text style={styles.modalTitle}>Error</Text>
-                <Text style={styles.modalText}>{calendarError}</Text>
-              </>
-            ) : (
-              <>
-                <Ionicons name="checkmark-circle" size={50} color={COLORS.success} style={styles.successIcon} />
-                <Text style={styles.modalTitle}>Success</Text>
-                <Text style={styles.modalText}>Appointment has been successfully added to your calendar!</Text>
-              </>
-            )}
+            <Ionicons 
+              name={calendarError ? "warning-outline" : "checkmark-circle"} 
+              size={50} 
+              color={calendarError ? COLORS.danger : COLORS.success} 
+              style={styles.successIcon} 
+            />
+            <Text style={styles.modalTitle}>
+              {calendarError ? 'Calendar Error' : 'Event Added'}
+            </Text>
+            <Text style={styles.modalText}>
+              {calendarError || 'The appointment has been successfully added to your calendar.'}
+            </Text>
             <TouchableOpacity 
-              style={styles.modalButton} 
+              style={[styles.modalButton, { backgroundColor: COLORS.primary }]} 
               onPress={() => setCalendarModalVisible(false)}
             >
-              <Text style={styles.modalButtonText}>OK</Text>
+              <Text style={[styles.modalButtonText, { color: COLORS.white, fontSize: 16, textShadowColor: 'rgba(0, 0, 0, 0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }]}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={cancelSuccessModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setCancelSuccessModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Ionicons 
+              name="checkmark-circle" 
+              size={50} 
+              color={COLORS.success} 
+              style={styles.successIcon} 
+            />
+            <Text style={styles.modalTitle}>Appointment Cancelled</Text>
+            <Text style={styles.modalText}>
+              The appointment has been successfully cancelled.
+            </Text>
+            <TouchableOpacity 
+              style={[styles.modalButton, { backgroundColor: COLORS.primary }]} 
+              onPress={() => setCancelSuccessModalVisible(false)}
+            >
+              <Text style={[styles.modalButtonText, { color: COLORS.white, fontSize: 16, textShadowColor: 'rgba(0, 0, 0, 0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }]}>OK</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -678,186 +790,96 @@ export default function MyAppointments() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background, marginTop: 30 },
-  tabContainer: { 
-    flexDirection: 'row', 
-    backgroundColor: COLORS.white, 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#eee', 
-    paddingHorizontal: 16 
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
-  tabButton: { 
-    flex: 1, 
-    paddingVertical: 16, 
-    alignItems: 'center', 
-    position: 'relative' 
-  },
-  activeTabButton: {},
-  activeTabIndicator: { 
-    position: 'absolute', 
-    bottom: 0, 
-    height: 3, 
-    width: '60%', 
-    backgroundColor: COLORS.primary, 
-    borderRadius: 3 
-  },
-  tabButtonText: { 
-    fontSize: 14, 
-    color: COLORS.muted, 
-    fontWeight: '500' 
-  },
-  activeTabButtonText: { 
-    color: COLORS.primary, 
-    fontWeight: '600' 
-  },
-  tabContent: { 
+  tabButton: {
     flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  tabContentContainer: {
-    padding: 20,
-    flexGrow: 1,
+  tabButtonText: {
+    fontSize: 16,
+    color: COLORS.muted,
+    fontWeight: '500',
   },
-  card: { 
-    backgroundColor: COLORS.white, 
-    borderRadius: 12, 
-    padding: 16, 
-    marginBottom: 16, 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.05, 
-    shadowRadius: 8, 
-    elevation: 2 
+  activeTabButton: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },
+  activeTabButtonText: { color: COLORS.primary, fontWeight: '600' },
+  activeTabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    height: 2,
+    width: '100%',
+    backgroundColor: COLORS.primary,
   },
-  cancelledCard: { 
-    backgroundColor: COLORS.white, 
-    borderLeftWidth: 4, 
-    borderLeftColor: COLORS.danger 
+  tabContent: { flex: 1 },
+  tabContentContainer: { padding: 16, paddingBottom: 100 },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  pastCard: { 
-    backgroundColor: COLORS.white, 
-    borderLeftWidth: 4, 
-    borderLeftColor: COLORS.success 
+  cancelledCard: { backgroundColor: '#F8E1E1' },
+  pastCard: { backgroundColor: '#E8F5E9' },
+  cardContent: { flexDirection: 'row', alignItems: 'center' },
+  imageContainer: { marginRight: 16 },
+  doctorImage: { width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: COLORS.primary },
+  infoContainer: { flex: 1 },
+  doctorName: { fontSize: 18, fontWeight: 'bold', color: COLORS.dark, marginBottom: 4 },
+  specialty: { fontSize: 14, color: COLORS.muted, marginBottom: 8 },
+  timeContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  dateTime: { fontSize: 14, color: COLORS.dark, marginLeft: 8 },
+  statusBadge: {
+    marginTop: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
   },
-  cardContent: { 
-    flexDirection: 'row', 
-    marginBottom: 12, 
-    alignItems: 'center' 
+  cancelledBadge: { backgroundColor: COLORS.danger },
+  completedBadge: { backgroundColor: COLORS.success },
+  statusBadgeText: { color: COLORS.white, fontSize: 12, fontWeight: '500' },
+  buttonContainer: { flexDirection: 'row', marginTop: 12, justifyContent: 'flex-end' },
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginLeft: 8,
   },
-  imageContainer: { 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.1, 
-    shadowRadius: 4 
+  calendarButtonStyle: { backgroundColor: COLORS.secondary },
+  updateButton: { backgroundColor: COLORS.warning },
+  deleteButton: { backgroundColor: COLORS.danger },
+  buttonText: { color: COLORS.white, fontSize: 14, fontWeight: '500', marginLeft: 4 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  loadingText: { marginTop: 12, fontSize: 16, color: COLORS.muted },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  errorText: { marginTop: 12, fontSize: 16, color: COLORS.danger, textAlign: 'center' },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
   },
-  doctorImage: { 
-    width: 90, 
-    height: 90, 
-    borderRadius: 45, 
-    marginRight: 16, 
-    borderWidth: 2, 
-    borderColor: COLORS.light 
-  },
-  infoContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    position: 'relative' 
-  },
-  doctorName: { 
-    fontSize: 18, 
-    fontWeight: '600', 
-    marginBottom: 4, 
-    color: COLORS.dark 
-  },
-  specialty: { 
-    fontSize: 14, 
-    color: COLORS.muted, 
-    marginBottom: 8 
-  },
-  timeContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginBottom: 6 
-  },
-  dateTime: { 
-    fontSize: 16, 
-    color: COLORS.dark, 
-    marginLeft: 6 
-  },
-  statusBadge: { 
-    alignSelf: 'flex-start', 
-    paddingHorizontal: 8, 
-    paddingVertical: 4, 
-    borderRadius: 12, 
-    marginTop: 8 
-  },
-  cancelledBadge: { 
-    backgroundColor: '#FEEBEE' 
-  },
-  completedBadge: { 
-    backgroundColor: '#E3F2FD' 
-  },
-  statusBadgeText: { 
-    fontSize: 12, 
-    fontWeight: '600' 
-  },
-  buttonContainer: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    marginTop: 12 
-  },
-  button: { 
-    paddingVertical: 10, 
-    paddingHorizontal: 12, 
-    borderRadius: 8, 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    flex: 1, 
-    marginHorizontal: 4, 
-    flexDirection: 'row' 
-  },
-  calendarButtonStyle: { 
-    backgroundColor: COLORS.success 
-  },
-  updateButton: { 
-    backgroundColor: COLORS.primary 
-  },
-  deleteButton: { 
-    backgroundColor: COLORS.danger 
-  },
-  buttonText: { 
-    color: COLORS.white, 
-    fontWeight: '500', 
-    fontSize: 14, 
-    marginLeft: 4 
-  },
-  emptyContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    paddingVertical: 60 
-  },
-  emptyIllustration: { 
-    backgroundColor: '#E3F2FD', 
-    width: 120, 
-    height: 120, 
-    borderRadius: 60, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: 20 
-  },
-  noAppointmentsText: { 
-    textAlign: 'center', 
-    marginTop: 8, 
-    fontSize: 18, 
-    fontWeight: '600', 
-    color: COLORS.dark 
-  },
-  emptySubtext: { 
-    textAlign: 'center', 
-    marginTop: 8, 
-    fontSize: 14, 
-    color: COLORS.muted, 
-    maxWidth: '70%' 
-  },
+  retryButtonText: { color: COLORS.white, fontSize: 16, fontWeight: '600' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  emptyIcon: { marginBottom: 16 },
+  noAppointmentsText: { fontSize: 18, color: COLORS.dark, fontWeight: '600', textAlign: 'center' },
+  emptySubtext: { fontSize: 14, color: COLORS.muted, marginTop: 8, textAlign: 'center' },
   modalOverlay: { 
     flex: 1, 
     backgroundColor: 'rgba(0,0,0,0.5)', 
@@ -867,15 +889,15 @@ const styles = StyleSheet.create({
   modalContainer: { 
     backgroundColor: COLORS.white, 
     borderRadius: 12, 
-    padding: 20, 
+    padding: 25, 
     width: '80%', 
     alignItems: 'center' 
   },
   modalTitle: { 
     fontSize: 20, 
-    fontWeight: '600', 
+    fontWeight: 'bold', 
     color: COLORS.dark, 
-    marginBottom: 10 
+    marginBottom: 12 
   },
   modalText: { 
     fontSize: 16, 
@@ -883,60 +905,27 @@ const styles = StyleSheet.create({
     textAlign: 'center', 
     marginBottom: 20 
   },
-  modalButtonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: 20
+  modalButtonContainer: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    width: '100%' 
   },
   modalButton: { 
-    backgroundColor: COLORS.primary, 
+    flex: 1, 
     paddingVertical: 10, 
     paddingHorizontal: 20, 
-    borderRadius: 8,
-    minWidth: 100,
-    alignItems: 'center'
+    borderRadius: 8, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    minHeight: 40, 
+    marginHorizontal: 8, 
+    marginTop: 10 
   },
   modalButtonText: { 
+    fontSize: 16, 
+    fontWeight: '600', 
     color: COLORS.white, 
-    fontSize: 16, 
-    fontWeight: '500' 
+    textAlign: 'center' 
   },
-  successIcon: { 
-    marginBottom: 20 
-  },
-  loadingContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
-  loadingText: { 
-    fontSize: 16, 
-    color: COLORS.muted,
-    marginTop: 10
-  },
-  errorContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    padding: 20 
-  },
-  errorText: { 
-    fontSize: 16, 
-    color: COLORS.danger, 
-    textAlign: 'center', 
-    marginBottom: 20,
-    marginTop: 10
-  },
-  retryButton: { 
-    backgroundColor: COLORS.primary, 
-    paddingVertical: 10, 
-    paddingHorizontal: 20, 
-    borderRadius: 8 
-  },
-  retryButtonText: { 
-    color: COLORS.white, 
-    fontSize: 16, 
-    fontWeight: '500' 
-  },
+  successIcon: { marginBottom: 16 },
 });

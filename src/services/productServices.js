@@ -59,7 +59,16 @@ export function getbookedlistview() {
   let data = {};
   return authAxios(getbookedList)
 }
-export async function doctorBookingView(customer_id, equipment_id, booking_date, start_time, end_time, duration) {
+export async function doctorBookingView(
+  customer_id,
+  equipment_id,
+  booking_date,
+  start_time,
+  end_time,
+  duration,
+  call_mode = "ADD_BOOKING",
+  booking_id = null
+) {
   try {
     const customerId = await AsyncStorage.getItem("Customer_id");
     let customerIdNumber = parseInt(customerId, 10);
@@ -120,17 +129,28 @@ export async function doctorBookingView(customer_id, equipment_id, booking_date,
         customer_id: effectiveCustomerId,
         equipment_id: equipment_id,
         booking_date: booking_date, // e.g., "08-04-2025"
-        start_time: formattedStartTime, // e.g., "10:30 am" or "14:30 pm"
-        end_time: formattedEndTime,     // e.g., "14:45 pm"
-        duration: duration,            // e.g., 1.0
-        call_mode: "ADD_BOOKING",
-        remarks: "add booking",
+        start_time: formattedStartTime, // e.g., "10:30 am"
+        end_time: formattedEndTime, // e.g., "14:45 pm"
+        duration: duration, // e.g., 1.0
+        call_mode: call_mode, // e.g., "ADD_BOOKING", "UPDATE", "CANCEL"
+        status: call_mode, // Set status to match call_mode
+        remarks: call_mode === "ADD_BOOKING" ? "add booking" : 
+                 call_mode === "UPDATE" ? "update booking" : 
+                 "cancel booking",
       },
     };
 
+    // Include booking_id for UPDATE and CANCEL
+    if (call_mode === "UPDATE" || call_mode === "CANCEL") {
+      if (!booking_id) {
+        throw new Error("Booking ID is required for update or cancel operations");
+      }
+      data.booking_data.booking_id = booking_id;
+    }
+
     return await authAxiosPost(doctorbooking, data);
   } catch (error) {
-    console.error("Error in doctorBookingView:", error);
+    console.error(`Error in doctorBookingView (${call_mode}):`, error);
     throw error; // Re-throw the error to be handled by the caller
   }
 }
