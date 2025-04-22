@@ -12,7 +12,7 @@ import {
   RefreshControl
 } from "react-native";
 import { router } from "expo-router";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { getProfileInfo } from "../services/authServices";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { getemployelistview } from "../services/productServices";
@@ -27,17 +27,19 @@ const COLORS = {
   secondaryText: "#666",
   rating: "#FFD700",
   danger: "#EF4444",
+  searchBackground: "#f5f5f5",
 };
 
 const STRINGS = {
   greeting: (name) =>
     name ? (name.length > 20 ? `${name.slice(0, 17)}...` : name) : "User",
-  searchPlaceholder: "Search doctors or services",
+  searchBase: "Search",
+  searchPhrase: "doctors or services",
   servicesTitle: "Services",
   doctorsTitle: "Top Rated Doctors",
   noServices: "No services found!",
   noDoctors: "No doctors found!",
-  bookNow: "Book Now!",
+  bookNow: "Book Now",
   loading: "Loading data...",
   error: "Failed to load data. Please try again.",
   appointmentLoading: "Loading appointments...",
@@ -73,26 +75,70 @@ const HomeScreen = () => {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [appointmentLoading, setAppointmentLoading] = useState(false);
+  
+  // Animation state
+  const [animatedPlaceholder, setAnimatedPlaceholder] = useState(STRINGS.searchBase);
+  const animationRef = useRef(null);
+  const isTypingRef = useRef(true);
+  const currentIndexRef = useRef(0);
+
+  // Typing animation effect
+  useEffect(() => {
+    const typeText = () => {
+      if (isTypingRef.current) {
+        // Typing phase
+        if (currentIndexRef.current <= STRINGS.searchPhrase.length) {
+          setAnimatedPlaceholder(
+            `${STRINGS.searchBase} ${STRINGS.searchPhrase.substring(0, currentIndexRef.current)}`
+          );
+          currentIndexRef.current++;
+          animationRef.current = setTimeout(typeText, 100); // Typing speed
+        } else {
+          // Switch to erasing after pause
+          isTypingRef.current = false;
+          animationRef.current = setTimeout(typeText, 1500); // Pause at full phrase
+        }
+      } else {
+        // Erasing phase
+        if (currentIndexRef.current >= 0) {
+          setAnimatedPlaceholder(
+            `${STRINGS.searchBase} ${STRINGS.searchPhrase.substring(0, currentIndexRef.current)}`
+          );
+          currentIndexRef.current--;
+          animationRef.current = setTimeout(typeText, 50); // Erasing speed
+        } else {
+          // Switch back to typing after pause
+          isTypingRef.current = true;
+          animationRef.current = setTimeout(typeText, 500); // Pause at base
+        }
+      }
+    };
+
+    animationRef.current = setTimeout(typeText, 1000); // Initial delay
+
+    return () => {
+      if (animationRef.current) {
+        clearTimeout(animationRef.current);
+      }
+    };
+  }, []);
 
   // Load appointments data with proper error handling
   const loadAppointmentsData = async () => {
     try {
       setAppointmentLoading(true);
       
-      // First try to get cached appointments
       const cachedAppointments = getAppointments();
       if (cachedAppointments?.upcoming?.length > 0) {
         setAppointments(cachedAppointments);
       }
       
-      // Then fetch fresh data
       await fetchBookedAppointments();
       const freshAppointments = getAppointments();
       setAppointments(freshAppointments || { upcoming: [] });
       
     } catch (error) {
       console.log("Appointments fetch warning:", error.message);
-      // Fallback to cached data if available
       const cachedAppointments = getAppointments();
       if (cachedAppointments) {
         setAppointments(cachedAppointments);
@@ -108,22 +154,20 @@ const HomeScreen = () => {
       setLoading(true);
       setError(null);
       
-      // Fetch profile and doctors in parallel
       const [employeeRes, profileRes] = await Promise.all([
         getemployelistview().catch(e => {
           console.error("Employee fetch error:", e);
-          return { data: [] }; // Return empty array on error
+          return { data: [] };
         }),
         getProfileInfo().catch(e => {
           console.error("Profile fetch error:", e);
-          return { data: {} }; // Return empty object on error
+          return { data: {} };
         })
       ]);
 
       setDoctorList(employeeRes?.data || []);
       setProfile(profileRes?.data || {});
 
-      // Load appointments separately
       await loadAppointmentsData();
 
     } catch (error) {
@@ -139,12 +183,16 @@ const HomeScreen = () => {
   useEffect(() => {
     loadData();
 
-    // Subscribe to appointment updates
     const unsubscribe = subscribeToAppointments((updatedAppointments) => {
       setAppointments(updatedAppointments || { upcoming: [] });
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (animationRef.current) {
+        clearTimeout(animationRef.current);
+      }
+    };
   }, []);
 
   // Refresh handler
@@ -183,6 +231,7 @@ const HomeScreen = () => {
   const handleServicePress = (serviceName) => {
     setSelectedService(serviceName === selectedService ? null : serviceName);
   };
+
   // UI Components
   const AppointmentCard = ({ item }) => (
     <TouchableOpacity style={styles.appointmentCard}>
@@ -270,48 +319,47 @@ const HomeScreen = () => {
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
       
       {/* Header Section */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Image source={{ uri: profile?.image }} style={styles.profileImage} />
-          <Text style={styles.greeting}>
-            {STRINGS.greeting(profile?.emp_data?.name)}
-          </Text>
-        </View>
-        <View style={styles.headerRight}>
+      <View style={styles.headerContainer}>
+        {/* Top Row - Profile and Book Now Button */}
+        <View style={styles.topRow}>
+          <View style={styles.profileContainer}>
+            <Image source={{ uri: profile?.image }} style={styles.profileImage} />
+            <View style={styles.profileTextContainer}>
+              <Text style={styles.welcomeText}>Welcome</Text>
+              <Text style={styles.userName}>{STRINGS.greeting(profile?.emp_data?.name)}</Text>
+            </View>
+          </View>
+          
           <TouchableOpacity 
-            onPress={() => router.push("/BookingAppointment")} 
             style={styles.bookNowButton}
+            onPress={() => router.push("/BookingAppointment")}
           >
-            <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+            <MaterialCommunityIcons name="plus" size={16} color="#fff" />
             <Text style={styles.bookNowText}>{STRINGS.bookNow}</Text>
           </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Search Section */}
-      <View style={styles.searchContainer}>
-        <MaterialCommunityIcons name="magnify" size={22} color="gray" />
-        <TextInput
-          placeholder={STRINGS.searchPlaceholder}
-          style={styles.searchInput}
-          value={searchText}
-          onChangeText={setSearchText}
-          placeholderTextColor="#999"
-        />
-        <TouchableOpacity 
-          onPress={() => setIsAscending(!isAscending)} 
-          style={styles.filterButton}
-        >
-          <MaterialCommunityIcons
-            name={
-              isAscending
-                ? "sort-alphabetical-ascending"
-                : "sort-alphabetical-descending"
-            }
-            size={22}
-            color="gray"
+        
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <MaterialCommunityIcons name="magnify" size={20} color="#777" />
+          <TextInput
+            placeholder={animatedPlaceholder}
+            placeholderTextColor="#999"
+            style={styles.searchInput}
+            value={searchText}
+            onChangeText={setSearchText}
           />
-        </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => setIsAscending(!isAscending)}
+            style={styles.filterButton}
+          >
+            <MaterialCommunityIcons
+              name={isAscending ? "sort-alphabetical-ascending" : "sort-alphabetical-descending"}
+              size={20}
+              color="#777"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Main Content */}
@@ -376,81 +424,103 @@ const HomeScreen = () => {
   );
 };
 
-// Styles
+// Styles remain the same as in your original code
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 20,
-    paddingHorizontal: 25,
     backgroundColor: COLORS.background,
   },
-  header: {
-    marginBottom: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    justifyContent: "space-between",
+  headerContainer: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingTop: 35,
+    paddingBottom: 18,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  profileContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   profileImage: {
     width: 50,
     height: 50,
     borderRadius: 25,
     borderWidth: 2,
-    borderColor: "#F1E7E7",
+    borderColor: 'rgba(255,255,255,0.3)',
   },
-  greeting: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginLeft: 15,
-    color: COLORS.text,
+  profileTextContainer: {
+    marginLeft: 12,
   },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+  welcomeText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+  },
+  userName: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 2,
   },
   bookNowButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   bookNowText: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     marginLeft: 5,
   },
   searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f1f1f1",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 20,
+    backgroundColor: COLORS.searchBackground,
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   searchInput: {
     flex: 1,
     marginLeft: 10,
     fontSize: 16,
     color: COLORS.text,
+    paddingVertical: 0,
   },
   filterButton: {
+    marginLeft: 5,
     padding: 5,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
     marginVertical: 10,
+    marginHorizontal: 20,
     color: COLORS.text,
   },
   servicesContainer: {
+    paddingLeft: 20,
     paddingBottom: 10,
   },
   serviceCard: {
@@ -464,7 +534,7 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   selectedServiceCard: {
-    backgroundColor: "#1E40AF",
+    backgroundColor: "#15507b",
     borderWidth: 2,
     borderColor: "#fff",
   },
@@ -475,6 +545,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   verticalList: {
+    paddingHorizontal: 20,
     marginBottom: 30,
   },
   doctorCard: {
@@ -526,6 +597,7 @@ const styles = StyleSheet.create({
   },
   appointmentsContainer: {
     marginBottom: 20,
+    paddingLeft: 20,
   },
   appointmentsList: {
     paddingBottom: 0,
