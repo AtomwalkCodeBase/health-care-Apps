@@ -20,10 +20,10 @@ import { getbookedlistview, doctorBookingView } from "../services/productService
 
 const COLORS = {
   primary: '#2196F3',
-  secondary: '#3A0CA3',
+  secondary: '#5CB338',
   success: '#4CAF50',
   danger: '#F44336',
-  warning: '#F8961E',
+  warning: '#3D90D7',
   light: '#F8F9FA',
   dark: '#212529',
   muted: '#6C757D',
