@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     alignItems: "center"
   },
   selectedSpecialtyCard: {
-    backgroundColor: "#2196f3",
+    backgroundColor: "#2a7fba",
     borderColor: "#1976d2"
   },
   specialtyText: {

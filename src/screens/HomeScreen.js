@@ -21,7 +21,7 @@ import { StatusBar } from "expo-status-bar";
 
 // Constants
 const COLORS = {
-  primary: "#3B82F6",
+  primary: "#2a7fba",
   background: "#fff",
   text: "#333",
   secondaryText: "#666",
