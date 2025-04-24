@@ -12,7 +12,7 @@ const _layout = () => {
           title: "Home",
           headerShown: false,
           tabBarIcon: ({ color }) => (
-            <Ionicons name="home-outline" size={24} color={color} />
+            <Ionicons name="home" size={24} color={color} />
           ),
         }}
       />
@@ -22,7 +22,7 @@ const _layout = () => {
           title: "My Appoinment",
           headerShown: false,
           tabBarIcon: ({ color }) => (
-            <Ionicons name="calendar-outline" size={24} color={color} />
+            <Ionicons name="calendar" size={24} color={color} />
           ),
         }}
       />
@@ -33,7 +33,7 @@ const _layout = () => {
           title: "Profile",
           headerShown: false,
           tabBarIcon: ({ color }) => (
-            <Ionicons name="person-outline" size={24} color={color} />
+            <Ionicons name="person" size={24} color={color} />
           ),
         }}
       ></Tabs.Screen>
