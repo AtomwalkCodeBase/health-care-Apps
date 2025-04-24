@@ -63,6 +63,25 @@ const serviceList = [
   { name: "Urology", icon: "water" },
 ].sort((a, b) => a.name.localeCompare(b.name));
 
+// Memoized ServiceCard component to prevent unnecessary re-renders
+const ServiceCard = React.memo(({ item, isSelected, onPress }) => (
+  <TouchableOpacity
+    style={[
+      styles.serviceCard,
+      isSelected && styles.selectedServiceCard,
+    ]}
+    onPress={onPress}
+  >
+    <MaterialCommunityIcons
+      name={item.icon}
+      size={30}
+      color="#fff"
+      style={styles.serviceIcon}
+    />
+    <Text style={styles.serviceText}>{item.name}</Text>
+  </TouchableOpacity>
+));
+
 const HomeScreen = () => {
   // State management
   const [profile, setProfile] = useState({});
@@ -229,7 +248,7 @@ const HomeScreen = () => {
   }, [searchText, isAscending, doctorList, selectedService]);
 
   const handleServicePress = (serviceName) => {
-    setSelectedService(serviceName === selectedService ? null : serviceName);
+    setSelectedService(selectedService === serviceName ? null : serviceName);
   };
 
   // UI Components
@@ -243,24 +262,6 @@ const HomeScreen = () => {
           {item.date} at {item.time}
         </Text>
       </View>
-    </TouchableOpacity>
-  );
-
-  const ServiceCard = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.serviceCard,
-        selectedService === item.name && styles.selectedServiceCard,
-      ]}
-      onPress={() => handleServicePress(item.name)}
-    >
-      <MaterialCommunityIcons
-        name={item.icon}
-        size={30}
-        color="#fff"
-        style={styles.serviceIcon}
-      />
-      <Text style={styles.serviceText}>{item.name}</Text>
     </TouchableOpacity>
   );
 
@@ -313,7 +314,6 @@ const HomeScreen = () => {
     );
   }
 
-  // Main render
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
@@ -381,7 +381,7 @@ const HomeScreen = () => {
           </View>
         ) : (
           appointments.upcoming?.length > 0 && (
-            <View style={styles.appointmentsContainer}>
+            <View>
               <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
               <FlatList
                 horizontal
@@ -400,10 +400,24 @@ const HomeScreen = () => {
         <FlatList
           horizontal
           data={filteredServices}
-          renderItem={({ item }) => <ServiceCard item={item} />}
+          renderItem={({ item }) => (
+            <ServiceCard 
+              item={item}
+              isSelected={selectedService === item.name}
+              onPress={() => handleServicePress(item.name)}
+            />
+          )}
           keyExtractor={(item) => item.name}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.servicesContainer}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          getItemLayout={(data, index) => ({
+            length: Dimensions.get("window").width * 0.4 + 12,
+            offset: (Dimensions.get("window").width * 0.4 + 12) * index,
+            index,
+          })}
         />
 
         {/* Doctors Section */}
@@ -424,7 +438,6 @@ const HomeScreen = () => {
   );
 };
 
-// Styles remain the same as in your original code
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -597,9 +610,9 @@ const styles = StyleSheet.create({
   },
   appointmentsContainer: {
     marginBottom: 20,
-    paddingLeft: 20,
   },
   appointmentsList: {
+    paddingLeft: 20,
     paddingBottom: 0,
   },
   appointmentCard: {
