@@ -9,7 +9,8 @@ import {
   Modal,
   Dimensions,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  Animated
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -196,7 +197,7 @@ const AppointmentCard = ({ appointment, onUpdate, onDelete, isCancelled, isPast,
   );
 };
 
-const TabButton = ({ active, label, onPress }) => (
+const TabButton = ({ active, label, onPress, tabWidth }) => (
   <TouchableOpacity
     style={[styles.tabButton, active && styles.activeTabButton]}
     onPress={onPress}
@@ -205,7 +206,6 @@ const TabButton = ({ active, label, onPress }) => (
     <Text style={[styles.tabButtonText, active && styles.activeTabButtonText]}>
       {label}
     </Text>
-    {active && <View style={styles.activeTabIndicator} />}
   </TouchableOpacity>
 );
 
@@ -418,8 +418,13 @@ export default function MyAppointments() {
   const { appointments, loading, error, refresh, moveToCancelled } = useAppointments();
   const router = useRouter();
   const scrollViewRef = useRef(null);
+  const indicatorAnim = useRef(new Animated.Value(0)).current;
+  const tabContainerRef = useRef(null);
+  const tabMeasurements = useRef([]);
 
   const SCREEN_WIDTH = Dimensions.get('window').width;
+  const TAB_COUNT = 3;
+  const TAB_WIDTH = SCREEN_WIDTH / TAB_COUNT;
 
   useEffect(() => {
     setActiveTab(tab);
@@ -430,7 +435,16 @@ export default function MyAppointments() {
     const index = ['upcoming', 'past', 'cancelled'].indexOf(tabName);
     if (scrollViewRef.current && index !== -1) {
       scrollViewRef.current.scrollTo({ x: index * SCREEN_WIDTH, animated: true });
+      moveIndicator(index);
     }
+  };
+
+  const moveIndicator = (index) => {
+    Animated.spring(indicatorAnim, {
+      toValue: index * TAB_WIDTH,
+      useNativeDriver: true,
+      speed: 20,
+    }).start();
   };
 
   const handleScroll = (event) => {
@@ -439,6 +453,7 @@ export default function MyAppointments() {
     const newTab = ['upcoming', 'past', 'cancelled'][index];
     if (newTab && newTab !== activeTab) {
       setActiveTab(newTab);
+      moveIndicator(index);
     }
   };
 
@@ -678,14 +693,15 @@ export default function MyAppointments() {
     <View style={styles.container}>
       <Header title="My Appointments" />
       
-      <View style={styles.tabContainer}>
+      <View style={styles.tabContainer} ref={tabContainerRef}>
         <TabButton 
           label="Upcoming" 
           active={activeTab === 'upcoming'} 
           onPress={() => {
             setActiveTab('upcoming');
             scrollToTab('upcoming');
-          }} 
+          }}
+          tabWidth={TAB_WIDTH}
         />
         <TabButton 
           label="Past" 
@@ -693,7 +709,8 @@ export default function MyAppointments() {
           onPress={() => {
             setActiveTab('past');
             scrollToTab('past');
-          }} 
+          }}
+          tabWidth={TAB_WIDTH}
         />
         <TabButton 
           label="Cancelled" 
@@ -701,7 +718,17 @@ export default function MyAppointments() {
           onPress={() => {
             setActiveTab('cancelled');
             scrollToTab('cancelled');
-          }} 
+          }}
+          tabWidth={TAB_WIDTH}
+        />
+        <Animated.View 
+          style={[
+            styles.activeTabIndicator, 
+            { 
+              transform: [{ translateX: indicatorAnim }],
+              width: TAB_WIDTH,
+            }
+          ]}
         />
       </View>
 
@@ -795,8 +822,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    position: 'relative',
   },
   tabButton: {
     flex: 1,
@@ -809,13 +835,12 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     fontWeight: '500',
   },
-  activeTabButton: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },
+  activeTabButton: {},
   activeTabButtonText: { color: COLORS.primary, fontWeight: '600' },
   activeTabIndicator: {
     position: 'absolute',
     bottom: 0,
     height: 2,
-    width: '100%',
     backgroundColor: COLORS.primary,
   },
   tabContent: { flex: 1 },

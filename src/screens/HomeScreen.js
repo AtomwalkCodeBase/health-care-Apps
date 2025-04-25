@@ -63,7 +63,7 @@ const serviceList = [
   { name: "Urology", icon: "water" },
 ].sort((a, b) => a.name.localeCompare(b.name));
 
-// Memoized ServiceCard component to prevent unnecessary re-renders
+// Memoized ServiceCard component
 const ServiceCard = React.memo(({ item, isSelected, onPress }) => (
   <TouchableOpacity
     style={[
@@ -71,6 +71,7 @@ const ServiceCard = React.memo(({ item, isSelected, onPress }) => (
       isSelected && styles.selectedServiceCard,
     ]}
     onPress={onPress}
+    activeOpacity={0.7}
   >
     <MaterialCommunityIcons
       name={item.icon}
@@ -81,6 +82,51 @@ const ServiceCard = React.memo(({ item, isSelected, onPress }) => (
     <Text style={styles.serviceText}>{item.name}</Text>
   </TouchableOpacity>
 ));
+
+// Memoized DoctorCard component with reliable navigation
+const DoctorCard = React.memo(({ item }) => {
+  const handlePress = () => {
+    router.push({
+      pathname: "/DoctorDetails",
+      params: { 
+        id: item.id.toString(),
+        name: item.name, 
+        image: item.image, 
+        specialty: item.department_name,
+        grade: item.grade_name
+      },
+    });
+  };
+
+  return (
+    <TouchableOpacity
+      style={styles.doctorCard}
+      onPress={handlePress}
+      activeOpacity={0.7}
+    >
+      {item.image ? (
+        <Image 
+          source={{ uri: item.image }} 
+          style={styles.doctorImage}
+        />
+      ) : (
+        <View style={[styles.doctorImage, styles.placeholderImage]}>
+          <MaterialCommunityIcons name="account" size={30} color="#ccc" />
+        </View>
+      )}
+      <View style={styles.doctorInfo}>
+        <Text style={styles.doctorName}>{item.name}</Text>
+        <Text style={styles.doctorSpecialty}>
+          {item.department_name} - {item.grade_name}
+        </Text>
+        <Text style={styles.doctorDetails}>
+          ⏰ 10:30 AM - 3:30 PM | Fee: 400
+        </Text>
+      </View>
+      <Text style={styles.rating}>⭐ 4.5</Text>
+    </TouchableOpacity>
+  );
+});
 
 const HomeScreen = () => {
   // State management
@@ -101,94 +147,21 @@ const HomeScreen = () => {
   const isTypingRef = useRef(true);
   const currentIndexRef = useRef(0);
 
-  // Typing animation effect
-  useEffect(() => {
-    const typeText = () => {
-      if (isTypingRef.current) {
-        // Typing phase
-        if (currentIndexRef.current <= STRINGS.searchPhrase.length) {
-          setAnimatedPlaceholder(
-            `${STRINGS.searchBase} ${STRINGS.searchPhrase.substring(0, currentIndexRef.current)}`
-          );
-          currentIndexRef.current++;
-          animationRef.current = setTimeout(typeText, 100); // Typing speed
-        } else {
-          // Switch to erasing after pause
-          isTypingRef.current = false;
-          animationRef.current = setTimeout(typeText, 1500); // Pause at full phrase
-        }
-      } else {
-        // Erasing phase
-        if (currentIndexRef.current >= 0) {
-          setAnimatedPlaceholder(
-            `${STRINGS.searchBase} ${STRINGS.searchPhrase.substring(0, currentIndexRef.current)}`
-          );
-          currentIndexRef.current--;
-          animationRef.current = setTimeout(typeText, 50); // Erasing speed
-        } else {
-          // Switch back to typing after pause
-          isTypingRef.current = true;
-          animationRef.current = setTimeout(typeText, 500); // Pause at base
-        }
-      }
-    };
-
-    animationRef.current = setTimeout(typeText, 1000); // Initial delay
-
-    return () => {
-      if (animationRef.current) {
-        clearTimeout(animationRef.current);
-      }
-    };
-  }, []);
-
-  // Load appointments data with proper error handling
-  const loadAppointmentsData = async () => {
-    try {
-      setAppointmentLoading(true);
-      
-      const cachedAppointments = getAppointments();
-      if (cachedAppointments?.upcoming?.length > 0) {
-        setAppointments(cachedAppointments);
-      }
-      
-      await fetchBookedAppointments();
-      const freshAppointments = getAppointments();
-      setAppointments(freshAppointments || { upcoming: [] });
-      
-    } catch (error) {
-      console.log("Appointments fetch warning:", error.message);
-      const cachedAppointments = getAppointments();
-      if (cachedAppointments) {
-        setAppointments(cachedAppointments);
-      }
-    } finally {
-      setAppointmentLoading(false);
-    }
-  };
-
-  // Main data loading function
+  // Load data
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
       
       const [employeeRes, profileRes] = await Promise.all([
-        getemployelistview().catch(e => {
-          console.error("Employee fetch error:", e);
-          return { data: [] };
-        }),
-        getProfileInfo().catch(e => {
-          console.error("Profile fetch error:", e);
-          return { data: {} };
-        })
+        getemployelistview(),
+        getProfileInfo()
       ]);
 
       setDoctorList(employeeRes?.data || []);
       setProfile(profileRes?.data || {});
 
       await loadAppointmentsData();
-
     } catch (error) {
       console.error("Data loading error:", error);
       setError(STRINGS.error);
@@ -198,41 +171,70 @@ const HomeScreen = () => {
     }
   };
 
-  // Initial load and subscription setup
-  useEffect(() => {
-    loadData();
-
-    const unsubscribe = subscribeToAppointments((updatedAppointments) => {
-      setAppointments(updatedAppointments || { upcoming: [] });
-    });
-
-    return () => {
-      unsubscribe();
-      if (animationRef.current) {
-        clearTimeout(animationRef.current);
-      }
-    };
-  }, []);
-
-  // Refresh handler
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadData();
+  // Load appointments
+  const loadAppointmentsData = async () => {
+    try {
+      setAppointmentLoading(true);
+      await fetchBookedAppointments();
+      const freshAppointments = getAppointments();
+      setAppointments(freshAppointments || { upcoming: [] });
+    } catch (error) {
+      console.log("Appointments fetch warning:", error.message);
+    } finally {
+      setAppointmentLoading(false);
+    }
   };
 
-  // Filter and sort doctors based on search and selection
+  // Initial load
+  useEffect(() => {
+    loadData();
+    const unsubscribe = subscribeToAppointments(setAppointments);
+    return unsubscribe;
+  }, []);
+
+  // Typing animation
+  useEffect(() => {
+    const typeText = () => {
+      if (isTypingRef.current) {
+        if (currentIndexRef.current <= STRINGS.searchPhrase.length) {
+          setAnimatedPlaceholder(
+            `${STRINGS.searchBase} ${STRINGS.searchPhrase.substring(0, currentIndexRef.current)}`
+          );
+          currentIndexRef.current++;
+          animationRef.current = setTimeout(typeText, 100);
+        } else {
+          isTypingRef.current = false;
+          animationRef.current = setTimeout(typeText, 1500);
+        }
+      } else {
+        if (currentIndexRef.current >= 0) {
+          setAnimatedPlaceholder(
+            `${STRINGS.searchBase} ${STRINGS.searchPhrase.substring(0, currentIndexRef.current)}`
+          );
+          currentIndexRef.current--;
+          animationRef.current = setTimeout(typeText, 50);
+        } else {
+          isTypingRef.current = true;
+          animationRef.current = setTimeout(typeText, 500);
+        }
+      }
+    };
+
+    animationRef.current = setTimeout(typeText, 1000);
+    return () => clearTimeout(animationRef.current);
+  }, []);
+
+  // Filter and sort doctors
   const { filteredServices, filteredDoctors } = useMemo(() => {
     const lowerText = searchText.toLowerCase();
-
-    const matchedServices = serviceList.filter((service) =>
+    const matchedServices = serviceList.filter(service =>
       service.name.toLowerCase().includes(lowerText)
     );
 
-    let matchedDoctors = (doctorList || []).filter(
-      (doc) =>
-        (doc.name?.toLowerCase()?.includes(lowerText) ||
-        doc.department_name?.toLowerCase()?.includes(lowerText)) &&
-        (!selectedService || doc.department_name === selectedService)
+    let matchedDoctors = doctorList.filter(doc =>
+      (doc.name?.toLowerCase()?.includes(lowerText) ||
+      doc.department_name?.toLowerCase()?.includes(lowerText)) &&
+      (!selectedService || doc.department_name === selectedService)
     );
 
     matchedDoctors = matchedDoctors.sort((a, b) =>
@@ -241,51 +243,17 @@ const HomeScreen = () => {
         : (b.name || "").localeCompare(a.name || "")
     );
 
-    return {
-      filteredServices: matchedServices,
-      filteredDoctors: matchedDoctors,
-    };
+    return { filteredServices: matchedServices, filteredDoctors: matchedDoctors };
   }, [searchText, isAscending, doctorList, selectedService]);
 
   const handleServicePress = (serviceName) => {
     setSelectedService(selectedService === serviceName ? null : serviceName);
   };
 
-  // UI Components
-  const AppointmentCard = ({ item }) => (
-    <TouchableOpacity style={styles.appointmentCard}>
-      <Image source={{ uri: item.image }} style={styles.appointmentImage} />
-      <View style={styles.appointmentInfo}>
-        <Text style={styles.appointmentDoctorName}>{item.doctorName}</Text>
-        <Text style={styles.appointmentDesignation}>{item.specialty}</Text>
-        <Text style={styles.appointmentDateTime}>
-          {item.date} at {item.time}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const DoctorCard = ({ item }) => (
-    <TouchableOpacity
-      style={styles.doctorCard}
-      onPress={() => router.push({
-        pathname: "/DoctorDetails",
-        params: { name: item.name, image: item.image, specialty: item.department_name },
-      })}
-    >
-      <Image source={{ uri: item.image }} style={styles.doctorImage} />
-      <View style={styles.doctorInfo}>
-        <Text style={styles.doctorName}>{item.name}</Text>
-        <Text style={styles.doctorSpecialty}>
-          {item.department_name} - {item.grade_name}
-        </Text>
-        <Text style={styles.doctorDetails}>
-          ⏰ 10:30 AM - 3:30 PM | Fee: 400
-        </Text>
-      </View>
-      <Text style={styles.rating}>⭐ 4.5</Text>
-    </TouchableOpacity>
-  );
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
 
   // Loading state
   if (loading && !refreshing) {
@@ -320,10 +288,18 @@ const HomeScreen = () => {
       
       {/* Header Section */}
       <View style={styles.headerContainer}>
-        {/* Top Row - Profile and Book Now Button */}
         <View style={styles.topRow}>
           <View style={styles.profileContainer}>
-            <Image source={{ uri: profile?.image }} style={styles.profileImage} />
+            {profile?.image ? (
+              <Image 
+                source={{ uri: profile.image }} 
+                style={styles.profileImage}
+              />
+            ) : (
+              <View style={[styles.profileImage, styles.placeholderImage]}>
+                <MaterialCommunityIcons name="account" size={24} color="#ccc" />
+              </View>
+            )}
             <View style={styles.profileTextContainer}>
               <Text style={styles.welcomeText}>Welcome</Text>
               <Text style={styles.userName}>{STRINGS.greeting(profile?.emp_data?.name)}</Text>
@@ -333,6 +309,7 @@ const HomeScreen = () => {
           <TouchableOpacity 
             style={styles.bookNowButton}
             onPress={() => router.push("/BookingAppointment")}
+            activeOpacity={0.7}
           >
             <MaterialCommunityIcons name="plus" size={16} color="#fff" />
             <Text style={styles.bookNowText}>{STRINGS.bookNow}</Text>
@@ -352,6 +329,7 @@ const HomeScreen = () => {
           <TouchableOpacity 
             onPress={() => setIsAscending(!isAscending)}
             style={styles.filterButton}
+            activeOpacity={0.7}
           >
             <MaterialCommunityIcons
               name={isAscending ? "sort-alphabetical-ascending" : "sort-alphabetical-descending"}
@@ -386,7 +364,30 @@ const HomeScreen = () => {
               <FlatList
                 horizontal
                 data={appointments.upcoming}
-                renderItem={({ item }) => <AppointmentCard item={item} />}
+                renderItem={({ item }) => (
+                  <TouchableOpacity 
+                    style={styles.appointmentCard}
+                    activeOpacity={0.7}
+                  >
+                    {item.image ? (
+                      <Image 
+                        source={{ uri: item.image }} 
+                        style={styles.appointmentImage}
+                      />
+                    ) : (
+                      <View style={[styles.appointmentImage, styles.placeholderImage]}>
+                        <MaterialCommunityIcons name="account" size={24} color="#ccc" />
+                      </View>
+                    )}
+                    <View style={styles.appointmentInfo}>
+                      <Text style={styles.appointmentDoctorName}>{item.doctorName}</Text>
+                      <Text style={styles.appointmentDesignation}>{item.specialty}</Text>
+                      <Text style={styles.appointmentDateTime}>
+                        {item.date} at {item.time}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
                 keyExtractor={(item) => item.id}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.appointmentsList}
@@ -410,14 +411,6 @@ const HomeScreen = () => {
           keyExtractor={(item) => item.name}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.servicesContainer}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={5}
-          getItemLayout={(data, index) => ({
-            length: Dimensions.get("window").width * 0.4 + 12,
-            offset: (Dimensions.get("window").width * 0.4 + 12) * index,
-            index,
-          })}
         />
 
         {/* Doctors Section */}
@@ -473,6 +466,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.3)',
   },
+  placeholderImage: {
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderColor: '#ddd',
+  },
   profileTextContainer: {
     marginLeft: 12,
   },
@@ -493,7 +492,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
   },
   bookNowText: {
     color: '#fff',
@@ -508,11 +506,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
   },
   searchInput: {
     flex: 1,
@@ -574,9 +567,6 @@ const styles = StyleSheet.create({
     height: 70,
     borderRadius: 30,
     marginRight: 15,
-    justifyContent: "center",
-    resizeMode: "cover",
-    alignItems: "center",
   },
   doctorInfo: {
     flex: 1,
@@ -607,9 +597,6 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     textAlign: "center",
     marginVertical: 20,
-  },
-  appointmentsContainer: {
-    marginBottom: 20,
   },
   appointmentsList: {
     paddingLeft: 20,
