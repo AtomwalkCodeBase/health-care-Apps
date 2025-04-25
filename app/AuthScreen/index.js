@@ -31,11 +31,11 @@ const LoginScreen = () => {
       return false;
     }
     if (!password) {
-      setErrorMessage("PIn is required");
+      setErrorMessage("Pin is required");
       return false;
     }
     if (password.length < 4) {
-      setErrorMessage("Password must be at least 4 characters long");
+      setErrorMessage("Pin must be 4 digits long");
       return false;
     }
     setErrorMessage("");
@@ -69,7 +69,7 @@ const LoginScreen = () => {
         setErrorMessage("Invalid User id or Password");
       }
     } catch (error) {
-      console.error("API call error:", error);
+      // console.error("API call error:", error);
       setErrorMessage("Invalid User id or Password");
     }
   };
