@@ -12,14 +12,13 @@ import {
   RefreshControl
 } from "react-native";
 import { router } from "expo-router";
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { getProfileInfo } from "../services/authServices";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { getemployelistview } from "../services/productServices";
 import { getAppointments, subscribeToAppointments, fetchBookedAppointments } from "./MyAppointments";
 import { StatusBar } from "expo-status-bar";
 
-// Constants
 const COLORS = {
   primary: "#2a7fba",
   background: "#fff",
@@ -45,7 +44,6 @@ const STRINGS = {
   appointmentLoading: "Loading appointments...",
 };
 
-// Services list sorted alphabetically
 const serviceList = [
   { name: "Cardiology", icon: "heart-pulse" },
   { name: "Dentistry", icon: "tooth-outline" },
@@ -63,7 +61,7 @@ const serviceList = [
   { name: "Urology", icon: "water" },
 ].sort((a, b) => a.name.localeCompare(b.name));
 
-// Memoized ServiceCard component
+// Memoized ServiceCard
 const ServiceCard = React.memo(({ item, isSelected, onPress }) => (
   <TouchableOpacity
     style={[
@@ -83,53 +81,37 @@ const ServiceCard = React.memo(({ item, isSelected, onPress }) => (
   </TouchableOpacity>
 ));
 
-// Memoized DoctorCard component with reliable navigation
-const DoctorCard = React.memo(({ item }) => {
-  const handlePress = () => {
-    router.push({
-      pathname: "/DoctorDetails",
-      params: { 
-        id: item.id.toString(),
-        name: item.name, 
-        image: item.image, 
-        specialty: item.department_name,
-        grade: item.grade_name
-      },
-    });
-  };
-
-  return (
-    <TouchableOpacity
-      style={styles.doctorCard}
-      onPress={handlePress}
-      activeOpacity={0.7}
-    >
-      {item.image ? (
-        <Image 
-          source={{ uri: item.image }} 
-          style={styles.doctorImage}
-        />
-      ) : (
-        <View style={[styles.doctorImage, styles.placeholderImage]}>
-          <MaterialCommunityIcons name="account" size={30} color="#ccc" />
-        </View>
-      )}
-      <View style={styles.doctorInfo}>
-        <Text style={styles.doctorName}>{item.name}</Text>
-        <Text style={styles.doctorSpecialty}>
-          {item.department_name} - {item.grade_name}
-        </Text>
-        <Text style={styles.doctorDetails}>
-          ⏰ 10:30 AM - 3:30 PM | Fee: 400
-        </Text>
+// Memoized DoctorCard
+const DoctorCard = React.memo(({ item, onPress }) => (
+  <TouchableOpacity
+    style={styles.doctorCard}
+    onPress={onPress}
+    activeOpacity={0.7}
+  >
+    {item.image ? (
+      <Image 
+        source={{ uri: item.image }} 
+        style={styles.doctorImage}
+      />
+    ) : (
+      <View style={[styles.doctorImage, styles.placeholderImage]}>
+        <MaterialCommunityIcons name="account" size={30} color="#ccc" />
       </View>
-      <Text style={styles.rating}>⭐ 4.5</Text>
-    </TouchableOpacity>
-  );
-});
+    )}
+    <View style={styles.doctorInfo}>
+      <Text style={styles.doctorName}>{item.name}</Text>
+      <Text style={styles.doctorSpecialty}>
+        {item.department_name} - {item.grade_name}
+      </Text>
+      <Text style={styles.doctorDetails}>
+        ⏰ 10:30 AM - 3:30 PM | Fee: 400
+      </Text>
+    </View>
+    <Text style={styles.rating}>⭐ 4.5</Text>
+  </TouchableOpacity>
+));
 
 const HomeScreen = () => {
-  // State management
   const [profile, setProfile] = useState({});
   const [searchText, setSearchText] = useState("");
   const [isAscending, setIsAscending] = useState(true);
@@ -140,39 +122,13 @@ const HomeScreen = () => {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [appointmentLoading, setAppointmentLoading] = useState(false);
-  
-  // Animation state
   const [animatedPlaceholder, setAnimatedPlaceholder] = useState(STRINGS.searchBase);
   const animationRef = useRef(null);
   const isTypingRef = useRef(true);
   const currentIndexRef = useRef(0);
 
-  // Load data
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const [employeeRes, profileRes] = await Promise.all([
-        getemployelistview(),
-        getProfileInfo()
-      ]);
-
-      setDoctorList(employeeRes?.data || []);
-      setProfile(profileRes?.data || {});
-
-      await loadAppointmentsData();
-    } catch (error) {
-      console.error("Data loading error:", error);
-      setError(STRINGS.error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  // Load appointments
-  const loadAppointmentsData = async () => {
+  // Data loading
+  const loadAppointmentsData = useCallback(async () => {
     try {
       setAppointmentLoading(true);
       await fetchBookedAppointments();
@@ -183,14 +139,37 @@ const HomeScreen = () => {
     } finally {
       setAppointmentLoading(false);
     }
-  };
+  }, []);
 
-  // Initial load
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [employeeRes, profileRes] = await Promise.all([
+        getemployelistview(),
+        getProfileInfo()
+      ]);
+      setDoctorList(employeeRes?.data || []);
+      setProfile(profileRes?.data || {});
+      await loadAppointmentsData();
+    } catch (error) {
+      console.error("Data loading error:", error);
+      setError(STRINGS.error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [loadAppointmentsData]);
+
+  // Initial load and subscription
   useEffect(() => {
     loadData();
     const unsubscribe = subscribeToAppointments(setAppointments);
-    return unsubscribe;
-  }, []);
+    return () => {
+      unsubscribe && unsubscribe();
+      if (animationRef.current) clearTimeout(animationRef.current);
+    };
+  }, [loadData]);
 
   // Typing animation
   useEffect(() => {
@@ -221,10 +200,12 @@ const HomeScreen = () => {
     };
 
     animationRef.current = setTimeout(typeText, 1000);
-    return () => clearTimeout(animationRef.current);
+    return () => {
+      if (animationRef.current) clearTimeout(animationRef.current);
+    };
   }, []);
 
-  // Filter and sort doctors
+  // Filtering and sorting
   const { filteredServices, filteredDoctors } = useMemo(() => {
     const lowerText = searchText.toLowerCase();
     const matchedServices = serviceList.filter(service =>
@@ -246,14 +227,28 @@ const HomeScreen = () => {
     return { filteredServices: matchedServices, filteredDoctors: matchedDoctors };
   }, [searchText, isAscending, doctorList, selectedService]);
 
-  const handleServicePress = (serviceName) => {
+  // Handlers
+  const handleServicePress = useCallback((serviceName) => {
     setSelectedService(selectedService === serviceName ? null : serviceName);
-  };
+  }, [selectedService]);
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadData();
-  };
+  }, [loadData]);
+
+  const handleDoctorPress = useCallback((item) => {
+    router.push({
+      pathname: "/DoctorDetails",
+      params: { 
+        id: item.id.toString(),
+        name: item.name, 
+        image: item.image, 
+        specialty: item.department_name,
+        grade: item.grade_name
+      },
+    });
+  }, []);
 
   // Loading state
   if (loading && !refreshing) {
@@ -285,8 +280,7 @@ const HomeScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
-      
-      {/* Header Section */}
+      {/* Header */}
       <View style={styles.headerContainer}>
         <View style={styles.topRow}>
           <View style={styles.profileContainer}>
@@ -305,7 +299,6 @@ const HomeScreen = () => {
               <Text style={styles.userName}>{STRINGS.greeting(profile?.emp_data?.name)}</Text>
             </View>
           </View>
-          
           <TouchableOpacity 
             style={styles.bookNowButton}
             onPress={() => router.push("/BookingAppointment")}
@@ -315,7 +308,6 @@ const HomeScreen = () => {
             <Text style={styles.bookNowText}>{STRINGS.bookNow}</Text>
           </TouchableOpacity>
         </View>
-        
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <MaterialCommunityIcons name="magnify" size={20} color="#777" />
@@ -339,7 +331,6 @@ const HomeScreen = () => {
           </TouchableOpacity>
         </View>
       </View>
-
       {/* Main Content */}
       <ScrollView 
         showsVerticalScrollIndicator={false}
@@ -351,7 +342,7 @@ const HomeScreen = () => {
           />
         }
       >
-        {/* Appointments Section */}
+        {/* Appointments */}
         {appointmentLoading ? (
           <View style={styles.sectionLoading}>
             <ActivityIndicator size="small" color={COLORS.primary} />
@@ -391,12 +382,14 @@ const HomeScreen = () => {
                 keyExtractor={(item) => item.id}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.appointmentsList}
+                getItemLayout={(data, index) => (
+                  {length: Dimensions.get("window").width * 0.7, offset: Dimensions.get("window").width * 0.7 * index, index}
+                )}
               />
             </View>
           )
         )}
-
-        {/* Services Section */}
+        {/* Services */}
         <Text style={styles.sectionTitle}>{STRINGS.servicesTitle}</Text>
         <FlatList
           horizontal
@@ -411,19 +404,26 @@ const HomeScreen = () => {
           keyExtractor={(item) => item.name}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.servicesContainer}
+          getItemLayout={(data, index) => (
+            {length: Dimensions.get("window").width * 0.4, offset: Dimensions.get("window").width * 0.4 * index, index}
+          )}
         />
-
-        {/* Doctors Section */}
+        {/* Doctors */}
         <Text style={styles.sectionTitle}>{STRINGS.doctorsTitle}</Text>
         {filteredDoctors.length === 0 ? (
           <Text style={styles.noResultsText}>{STRINGS.noDoctors}</Text>
         ) : (
           <FlatList
             data={filteredDoctors}
-            renderItem={({ item }) => <DoctorCard item={item} />}
+            renderItem={({ item }) => (
+              <DoctorCard item={item} onPress={() => handleDoctorPress(item)} />
+            )}
             keyExtractor={(item) => item.id.toString()}
             scrollEnabled={false}
             contentContainerStyle={styles.verticalList}
+            getItemLayout={(data, index) => (
+              {length: 97, offset: 97 * index, index}
+            )}
           />
         )}
       </ScrollView>
@@ -637,8 +637,8 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: COLORS.background,
   },
   loadingText: {
@@ -647,15 +647,15 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
     backgroundColor: COLORS.background,
   },
   errorText: {
     color: COLORS.danger,
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 20,
     marginTop: 10,
   },
@@ -666,13 +666,13 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   retryButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
   },
   sectionLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     padding: 10,
   },
   sectionLoadingText: {
