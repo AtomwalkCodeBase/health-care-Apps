@@ -31,7 +31,7 @@ const Sidebar = ({ profile, onNavigate, onLogout }) => {
         <SidebarItem icon="home-outline" label="Homepage" onPress={() => router.push("/home")} />
         <SidebarItem icon="bell-outline" label="Notifications" onPress={() => router.push("/Notifications")} />
         <SidebarItem icon="file-document-outline" label="My Reports" onPress={() => router.push("/Reports")} />
-        <SidebarItem icon="clipboard-text-outline" label="My Tasks" onPress={() => router.push("MyTasks")} />
+        <SidebarItem icon="clipboard-text-outline" label="My Tasks" onPress={() => router.push("/Tasks")} />
         <SidebarItem icon="stethoscope" label="Medical Records" onPress={() => router.push("MedicalRecords")} />
         <SidebarItem icon="bed-outline" label="In-Patient System" onPress={() => router.push("InPatientSystem")} />
       </View>
@@ -69,12 +69,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingTop: 44,
     paddingHorizontal: 24,
-    width: 300, // Fixed width
+    width: 300,
     height: "100%",
     elevation: 16,
     shadowColor: "#000",
     shadowOpacity: 0.15,
     shadowRadius: 12,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
     shadowOffset: { width: 4, height: 0 },
   },
   profileSection: {
