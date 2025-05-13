@@ -1,6 +1,8 @@
 import React from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import { router } from "expo-router";
+
 
 const Sidebar = ({ profile, onNavigate, onLogout }) => {
   return (
@@ -26,12 +28,12 @@ const Sidebar = ({ profile, onNavigate, onLogout }) => {
 
       {/* Menu Items */}
       <View style={styles.menuSection}>
-        <SidebarItem icon="home-outline" label="Homepage" onPress={() => onNavigate("Homepage")} />
-        <SidebarItem icon="bell-outline" label="Notifications" onPress={() => onNavigate("Notifications")} />
-        <SidebarItem icon="file-document-outline" label="My Reports" onPress={() => onNavigate("MyReports")} />
-        <SidebarItem icon="clipboard-text-outline" label="My Tasks" onPress={() => onNavigate("MyTasks")} />
-        <SidebarItem icon="stethoscope" label="Medical Records" onPress={() => onNavigate("MedicalRecords")} />
-        <SidebarItem icon="bed-outline" label="In-Patient System" onPress={() => onNavigate("InPatientSystem")} />
+        <SidebarItem icon="home-outline" label="Homepage" onPress={() => router.push("/home")} />
+        <SidebarItem icon="bell-outline" label="Notifications" onPress={() => router.push("/Notifications")} />
+        <SidebarItem icon="file-document-outline" label="My Reports" onPress={() => router.push("/Reports")} />
+        <SidebarItem icon="clipboard-text-outline" label="My Tasks" onPress={() => router.push("MyTasks")} />
+        <SidebarItem icon="stethoscope" label="Medical Records" onPress={() => router.push("MedicalRecords")} />
+        <SidebarItem icon="bed-outline" label="In-Patient System" onPress={() => router.push("InPatientSystem")} />
       </View>
 
       {/* Other Section */}
