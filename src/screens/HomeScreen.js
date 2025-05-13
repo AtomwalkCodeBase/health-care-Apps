@@ -18,6 +18,7 @@ import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityI
 import { getemployelistview } from "../services/productServices";
 import { getAppointments, subscribeToAppointments, fetchBookedAppointments } from "./MyAppointments";
 import { StatusBar } from "expo-status-bar";
+import Sidebar from "./Sidebar"; // <-- Add this import
 
 const COLORS = {
   primary: "#2a7fba",
@@ -126,6 +127,9 @@ const HomeScreen = () => {
   const animationRef = useRef(null);
   const isTypingRef = useRef(true);
   const currentIndexRef = useRef(0);
+
+  // --- Sidebar state ---
+  const [sidebarVisible, setSidebarVisible] = useState(false);
 
   // Data loading
   const loadAppointmentsData = useCallback(async () => {
@@ -242,7 +246,7 @@ const HomeScreen = () => {
       pathname: "/DoctorDetails",
       params: { 
         id: item.id.toString(),
-        name: item.name, 
+        name: item.name,
         image: item.image, 
         specialty: item.department_name,
         grade: item.grade_name
@@ -283,7 +287,12 @@ const HomeScreen = () => {
       {/* Header */}
       <View style={styles.headerContainer}>
         <View style={styles.topRow}>
-          <View style={styles.profileContainer}>
+          {/* --- Profile area: make it open the sidebar --- */}
+          <TouchableOpacity
+            style={styles.profileContainer}
+            onPress={() => setSidebarVisible(true)}
+            activeOpacity={0.7}
+          >
             {profile?.image ? (
               <Image 
                 source={{ uri: profile.image }} 
@@ -298,7 +307,7 @@ const HomeScreen = () => {
               <Text style={styles.welcomeText}>Welcome</Text>
               <Text style={styles.userName}>{STRINGS.greeting(profile?.emp_data?.name)}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
           <TouchableOpacity 
             style={styles.bookNowButton}
             onPress={() => router.push("/BookingAppointment")}
@@ -427,6 +436,36 @@ const HomeScreen = () => {
           />
         )}
       </ScrollView>
+      {/* --- Sidebar Overlay --- */}
+      {sidebarVisible && (
+        <View style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          flexDirection: "row",
+          zIndex: 99,
+        }}>
+          <Sidebar
+            profile={profile}
+            onNavigate={(screen) => {
+              setSidebarVisible(false);
+              router.push("/" + screen);
+            }}
+            onLogout={() => {
+              setSidebarVisible(false);
+              // Add your logout logic here
+              router.replace("/Login");
+            }}
+          />
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.2)" }}
+            activeOpacity={1}
+            onPress={() => setSidebarVisible(false)}
+          />
+        </View>
+      )}
     </View>
   );
 };
