@@ -113,6 +113,26 @@ const parseFullDate = (dateStr) => {
   }
 };
 
+const parseDateTimeForComparison = (dateString, timeString) => {
+  if (!dateString || !timeString) return null;
+
+  const date = parseFullDate(dateString);
+  if (!date) return null;
+
+  const match = timeString.match(/(\d+:\d+)([AP]M)?/i);
+  if (!match) return null;
+
+  const [time, period] = match.slice(1);
+  let [hours, minutes] = time.split(':').map(Number);
+  if (period) {
+    if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+    if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
+  }
+
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+};
+
 const parseDateTime = (dateString, timeString) => {
   if (!dateString || !timeString) return null;
 
@@ -227,8 +247,7 @@ export const fetchBookedAppointments = async () => {
 
     const bookingsArray = Array.isArray(apiData) ? apiData : [apiData];
 
-    const currentDate = new Date();
-    currentDate.setHours(0, 0, 0, 0);
+    const currentDateTime = new Date();
 
     const appointments = {
       upcoming: [],
@@ -244,7 +263,7 @@ export const fetchBookedAppointments = async () => {
       
       const appointment = {
         id: booking.id?.toString() || `${Date.now()}-${Math.random()}`,
-        booking_id: booking.booking_id?.toString() || booking.id?.toString(), // Use booking_id, fallback to id
+        booking_id: booking.booking_id?.toString() || booking.id?.toString(),
         doctorName: booking.equipment_data?.name || 'Unknown Equipment',
         specialty: booking.equipment_data?.equipment_type || 'Unknown Type',
         date: booking.booking_date || new Date().toISOString(),
@@ -264,11 +283,104 @@ export const fetchBookedAppointments = async () => {
 
       if (status.toLowerCase() === 'cancelled') {
         appointments.cancelled.push(appointment);
-      } else if (bookingDate && bookingDate < currentDate) {
-        appointments.past.push(appointment);
       } else {
-        appointments.upcoming.push(appointment);
+        const appointmentDateTime = parseDateTimeForComparison(booking.booking_date, booking.start_time);
+        if (appointmentDateTime && appointmentDateTime < currentDateTime) {
+          appointments.past.push(appointment);
+        } else {
+          appointments.upcoming.push(appointment);
+        }
       }
+    });
+
+    // Sort upcoming appointments by date and time (closest to current date/time first, ascending)
+    appointments.upcoming.sort((a, b) => {
+      const dateA = parseFullDate(a.date);
+      const dateB = parseFullDate(b.date);
+
+      if (!dateA || !dateB) return 0;
+
+      const timeA = a.start_time?.match(/(\d+:\d+)([AP]M)?/i);
+      const timeB = b.start_time?.match(/(\d+:\d+)([AP]M)?/i);
+
+      if (!timeA || !timeB) return dateA - dateB;
+
+      let [hoursA, minutesA] = timeA[1].split(':').map(Number);
+      let [hoursB, minutesB] = timeB[1].split(':').map(Number);
+
+      if (timeA[2]) {
+        if (timeA[2].toUpperCase() === 'PM' && hoursA !== 12) hoursA += 12;
+        if (timeA[2].toUpperCase() === 'AM' && hoursA === 12) hoursA = 0;
+      }
+      if (timeB[2]) {
+        if (timeB[2].toUpperCase() === 'PM' && hoursB !== 12) hoursB += 12;
+        if (timeB[2].toUpperCase() === 'AM' && hoursB === 12) hoursB = 0;
+      }
+
+      dateA.setHours(hoursA, minutesA, 0, 0);
+      dateB.setHours(hoursB, minutesB, 0, 0);
+
+      return dateA - dateB;
+    });
+
+    // Sort past appointments by date and time (most recent first, descending)
+    appointments.past.sort((a, b) => {
+      const dateA = parseFullDate(a.date);
+      const dateB = parseFullDate(b.date);
+
+      if (!dateA || !dateB) return 0;
+
+      const timeA = a.start_time?.match(/(\d+:\d+)([AP]M)?/i);
+      const timeB = b.start_time?.match(/(\d+:\d+)([AP]M)?/i);
+
+      if (!timeA || !timeB) return dateB - dateA;
+
+      let [hoursA, minutesA] = timeA[1].split(':').map(Number);
+      let [hoursB, minutesB] = timeB[1].split(':').map(Number);
+
+      if (timeA[2]) {
+        if (timeA[2].toUpperCase() === 'PM' && hoursA !== 12) hoursA += 12;
+        if (timeA[2].toUpperCase() === 'AM' && hoursA === 12) hoursA = 0;
+      }
+      if (timeB[2]) {
+        if (timeB[2].toUpperCase() === 'PM' && hoursB !== 12) hoursB += 12;
+        if (timeB[2].toUpperCase() === 'AM' && hoursB === 12) hoursB = 0;
+      }
+
+      dateA.setHours(hoursA, minutesA, 0, 0);
+      dateB.setHours(hoursB, minutesB, 0, 0);
+
+      return dateB - dateA;
+    });
+
+    // Sort cancelled appointments by date and time (most recent first, descending)
+    appointments.cancelled.sort((a, b) => {
+      const dateA = parseFullDate(a.date);
+      const dateB = parseFullDate(b.date);
+
+      if (!dateA || !dateB) return 0;
+
+      const timeA = a.start_time?.match(/(\d+:\d+)([AP]M)?/i);
+      const timeB = b.start_time?.match(/(\d+:\d+)([AP]M)?/i);
+
+      if (!timeA || !timeB) return dateB - dateA;
+
+      let [hoursA, minutesA] = timeA[1].split(':').map(Number);
+      let [hoursB, minutesB] = timeB[1].split(':').map(Number);
+
+      if (timeA[2]) {
+        if (timeA[2].toUpperCase() === 'PM' && hoursA !== 12) hoursA += 12;
+        if (timeA[2].toUpperCase() === 'AM' && hoursA === 12) hoursA = 0;
+      }
+      if (timeB[2]) {
+        if (timeB[2].toUpperCase() === 'PM' && hoursB !== 12) hoursB += 12;
+        if (timeB[2].toUpperCase() === 'AM' && hoursB === 12) hoursB = 0;
+      }
+
+      dateA.setHours(hoursA, minutesA, 0, 0);
+      dateB.setHours(hoursB, minutesB, 0, 0);
+
+      return dateB - dateA;
     });
 
     appointmentsState = appointments;
