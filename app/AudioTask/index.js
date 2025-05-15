@@ -16,7 +16,7 @@ import { Audio } from 'expo-av';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { getusertasklistview } from '../../src/services/productServices';
 import { useRouter } from 'expo-router';
-import MiniPlayer from './../../src/components/MiniPlayer';
+import MiniPlayer from '../../src/components/MiniPlayer';
 
 export default function MyTasks() {
   const [tasks, setTasks] = useState([]);

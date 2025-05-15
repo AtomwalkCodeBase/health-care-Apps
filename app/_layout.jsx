@@ -20,6 +20,8 @@ export default function RootLayout() {
       <Stack.Screen name="BookingConfirmation/index" options={{headerShown:false}}/>
       <Stack.Screen name="Reports/index" options={{headerShown:false}}/>
       <Stack.Screen name="Tasks/index" options={{headerShown:false}}/>
+      <Stack.Screen name="Category/index" options={{headerShown:false}}/>
+      <Stack.Screen name="AudioTask/index" options={{headerShown:false}}/>
 
     </Stack>
     </AppProvider>
