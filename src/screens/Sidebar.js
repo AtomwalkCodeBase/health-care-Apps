@@ -31,7 +31,7 @@ const Sidebar = ({ profile, onNavigate, onLogout }) => {
         <SidebarItem icon="home-outline" label="Homepage" onPress={() => router.push("/home")} />
         <SidebarItem icon="bell-outline" label="Notifications" onPress={() => router.push("/Notifications")} />
         <SidebarItem icon="file-document-outline" label="My Reports" onPress={() => router.push("/Reports")} />
-        <SidebarItem icon="clipboard-text-outline" label="My Tasks" onPress={() => router.push("/Category")} />
+        <SidebarItem icon="clipboard-text-outline" label="My Tasks" onPress={() => router.push("/TaskCategory")} />
         <SidebarItem icon="stethoscope" label="Medical Records" onPress={() => router.push("MedicalRecords")} />
         <SidebarItem icon="bed-outline" label="In-Patient System" onPress={() => router.push("InPatientSystem")} />
       </View>
