@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList, getemployeeList, getequipmentList, userLoginURL, getbookedList, doctorbooking, setuserpin } from "../services/ConstantServies";
+import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList, getemployeeList, getequipmentList, userLoginURL, getbookedList, doctorbooking, setuserpin, userTaskList } from "../services/ConstantServies";
 import { authAxios, authAxiosFilePost, authAxiosPost } from "./HttpMethod";
 
 export function getEmpLeave(leave_type, emp_id, year) {
@@ -223,6 +223,22 @@ export async function setuserpinview(o_pin, n_pin) {
     return response;
   } catch (error) {
     console.error("Error in setuserpinView:", error.response ? error.response.data : error.message);
+    throw error;
+  }
+}
+
+export function getusertasklistview(task_type, customer_id) {
+  try {
+    let data = {};
+    if (task_type) {
+      data['task_type'] = task_type;
+    }
+    if (customer_id) {
+      data['customer_id'] = customer_id;
+    }
+    return authAxios(userTaskList, data);
+  } catch (error) {
+    console.error("Error in getusertasklistview:", error.response ? error.response.data : error.message);
     throw error;
   }
 }

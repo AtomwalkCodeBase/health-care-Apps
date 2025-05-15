@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,41 +11,56 @@ import {
   BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { getusertasklistview } from '../../src/services/productServices';
 import { useRouter } from 'expo-router';
 import MiniPlayer from './../../src/components/MiniPlayer';
 
-const musicTracks = [
-  {
-    id: '1',
-    title: 'Krishna Flute',
-    artist: 'krishna',
-    artwork: require('./../../assets/images/waveform.png'),
-    audioFile: require('./../../assets/music/krishnaFlute.mp3'),
-  },
-  {
-    id: '2',
-    title: 'Samurai Flute',
-    artist: 'Samurai',
-    artwork: require('./../../assets/images/waveform.png'),
-    audioFile: require('./../../assets/music/samurai.mp3'),
-  },
-  {
-    id: '3',
-    title: 'Zindagi Do Pal Ki',
-    artist: 'K.K',
-    artwork: require('./../../assets/images/waveform.png'),
-    audioFile: require('./../../assets/music/zindagi.mp3'),
-  },
-];
-
 export default function MyTasks() {
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState({ visible: false, message: '' });
   const [sound, setSound] = useState(null);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loadingId, setLoadingId] = useState(null);
   const router = useRouter();
+
+  // Get customer ID from AsyncStorage
+  const getCustomerId = async () => {
+    const customerId = await AsyncStorage.getItem('Customer_id');
+    return customerId ? parseInt(customerId, 10) : null;
+  };
+
+  // Fetch tasks
+  const fetchTasks = useCallback(async () => {
+    try {
+      setLoading(true);
+      const customerId = await getCustomerId();
+      const res = await getusertasklistview('ALL', 46);
+      // Filter tasks to only include audio files
+      const audioTasks = res.data.filter(task => 
+        task.ref_file && (
+          task.ref_file.toLowerCase().includes('.mp3') ||
+          task.ref_file.toLowerCase().endsWith('.wav') ||
+          task.ref_file.toLowerCase().endsWith('.m4a')
+        )
+      );
+      setTasks(audioTasks);
+    } catch (err) {
+      console.error('Failed to fetch tasks:', err.message);
+      setError({ visible: true, message: 'Failed to load tasks' });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch tasks on mount
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
 
   // Handle hardware back button
   useEffect(() => {
@@ -74,9 +89,11 @@ export default function MyTasks() {
 
   const handlePlaybackStatusUpdate = (status) => {
     setIsPlaying(status.isPlaying);
+    if (status.didJustFinish) {
+      setCurrentTrack(null);
+    }
   };
 
-  // --- FIXED LOGIC HERE ---
   const playTrack = async (track) => {
     try {
       // If clicking the same track that's currently loaded
@@ -99,7 +116,7 @@ export default function MyTasks() {
 
       // Load new sound
       const { sound: newSound } = await Audio.Sound.createAsync(
-        track.audioFile,
+        { uri: track.ref_file },
         { shouldPlay: true },
         handlePlaybackStatusUpdate
       );
@@ -109,11 +126,11 @@ export default function MyTasks() {
       setIsPlaying(true);
     } catch (error) {
       console.error('Playback error:', error);
+      setError({ visible: true, message: 'Failed to play audio' });
     } finally {
       setLoadingId(null);
     }
   };
-  // --- END FIXED LOGIC ---
 
   const handlePlayPause = async () => {
     if (!sound) return;
@@ -137,10 +154,13 @@ export default function MyTasks() {
 
     return (
       <View style={styles.trackItem}>
-        <Image source={item.artwork} style={styles.trackArtwork} />
+        <Image 
+          source={require('./../../assets/images/waveform.png')} 
+          style={styles.trackArtwork} 
+        />
         <View style={styles.trackInfo}>
-          <Text style={styles.trackTitle}>{item.title}</Text>
-          <Text style={styles.trackArtist}>{item.artist}</Text>
+          <Text style={styles.trackTitle}>{item.task_type || 'Audio Task'}</Text>
+          <Text style={styles.trackArtist}>Singer: {item.customer.name}</Text>
         </View>
         <View style={styles.trackControls}>
           <TouchableOpacity
@@ -179,29 +199,48 @@ export default function MyTasks() {
 
       <View style={styles.content}>
         <Text style={styles.sectionTitle}>Listen this!</Text>
-        <FlatList
-          data={musicTracks}
-          keyExtractor={(item) => item.id}
-          renderItem={renderTrackItem}
-          contentContainerStyle={styles.tracksList}
-        />
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2a7fba" />
+          </View>
+        ) : error.visible ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error.message}</Text>
+          </View>
+        ) : tasks.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No audio tasks available.</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={tasks}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderTrackItem}
+            contentContainerStyle={styles.tracksList}
+          />
+        )}
       </View>
 
       {currentTrack && (
         <MiniPlayer
           sound={sound}
-          track={currentTrack}
+          track={{
+            ...currentTrack,
+            title: currentTrack.task_type || 'Audio Task',
+            artist: `Customer ID: ${currentTrack.customer.id}`,
+            artwork: require('./../../assets/images/waveform.png'),
+          }}
           isPlaying={isPlaying}
           onPlayPause={handlePlayPause}
           onNext={() => {
-            const currentIndex = musicTracks.findIndex(t => t.id === currentTrack.id);
-            const nextIndex = (currentIndex + 1) % musicTracks.length;
-            playTrack(musicTracks[nextIndex]);
+            const currentIndex = tasks.findIndex(t => t.id === currentTrack.id);
+            const nextIndex = (currentIndex + 1) % tasks.length;
+            playTrack(tasks[nextIndex]);
           }}
           onPrevious={() => {
-            const currentIndex = musicTracks.findIndex(t => t.id === currentTrack.id);
-            const prevIndex = currentIndex === 0 ? musicTracks.length - 1 : currentIndex - 1;
-            playTrack(musicTracks[prevIndex]);
+            const currentIndex = tasks.findIndex(t => t.id === currentTrack.id);
+            const prevIndex = currentIndex === 0 ? tasks.length - 1 : currentIndex - 1;
+            playTrack(tasks[prevIndex]);
           }}
         />
       )}
@@ -238,4 +277,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
   downloadButton: { padding: 4 },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#d32f2f',
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
 });
