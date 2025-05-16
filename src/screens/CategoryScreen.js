@@ -15,13 +15,13 @@ const { width } = Dimensions.get('window');
 const CARD_SIZE = (width - 60) / 2;
 
 import Header from './../components/Header';
-import LabImg from '../../assets/images/R1.png';
-import MedicineImg from '../../assets/images/R2.png';
+import AudioImg from '../../assets/images/audio.png';
+import ExerciseImg from '../../assets/images/R2.png';
 import DietImg from '../../assets/images/R3.png';
-import ExerciseImg from '../../assets/images/R4.png';
+import MedicineImg from '../../assets/images/R4.png';
 
 const categories = [
-  { label: 'Audio', image: LabImg, route: '/AudioTask' },
+  { label: 'Audio', image: AudioImg, route: '/AudioTask' },
   { label: 'Medicine', image: MedicineImg, route: '/MedicineTask' },
   { label: 'Diet/Nutrition', image: DietImg, route: '/DietTask' },
   { label: 'Exercise', image: ExerciseImg, route: '/ExerciseTask' },
