@@ -1,105 +1,203 @@
-// src/context/AppContext.js
 import React, { createContext, useState, useEffect } from 'react';
 import { publicAxiosRequest } from "../src/services/HttpMethod";
-import { loginURL } from "../src/services/ConstantServies";
+// import { customerLogin } from "../src/services/ConstantServies";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {getCompanyInfo} from '../src/services/authServices'
-import { Alert } from 'react-native'
-import axios from "axios";
+import { getCompanyInfo } from '../src/services/authServices';
 import { useRouter } from 'expo-router';
-import { customerLogin } from '../src/services/productServices';
+import NetInfo from '@react-native-community/netinfo';
+// import NetworkErrorModal from '../src/components/NetworkErrorModal';
+import { userLoginURL } from '../src/services/ConstantServies';
+import NetworkErrorModal from '../src/components/NetworkErrorModal'
 
-// import { useRoute } from '@react-navigation/native';
-
-// Create the context
 const AppContext = createContext();
 
-// Create a provider component
 const AppProvider = ({ children }) => {
-    const [state, setState] = useState("datass");
     const [isLoading, setIsLoading] = useState(false);
     const [userToken, setUserToken] = useState(null);
     const [companyInfo, setCompanyInfo] = useState(null);
     const [dbName, setDbName] = useState(null);
-    const [error, setError] = useState('');
-    const [refs,setRefs]=useState(1);
-    const router=useRouter();
+    const [isConnected, setIsConnected] = useState(true);
 
-    const login = async(username, password) => {
-      let tokens=`bf4401f70476590e194d2ed625f227f9532392c2`;
-    await AsyncStorage.setItem("userToken", tokens);
-        setIsLoading(true);
-        let finalUsername = username;
-        try {
-          const response = await customerLogin(finalUsername,password);
-          if (response.status === 200) {
-            AsyncStorage.setItem("Password", password);
-            AsyncStorage.setItem("username", finalUsername);
-            const userToken = response.data?.token;
-            const Customer_id = response.data?.customer_id;
-            await AsyncStorage.setItem("Customer_id", Customer_id.toString());
-            await AsyncStorage.setItem("userToken", userToken);
-            router.push("/home");
-          } else {
-            alert("Invalid User id or Password");
-          }
-        } catch (error) {
-          console.error("API call error:", error);
-          setErrorMessage("Invalid User id or Password");
+    const router = useRouter();
+
+    const checkNetwork = async () => {
+        const netState = await NetInfo.fetch();
+        setIsConnected(netState.isConnected);
+        return netState.isConnected;
+    };
+
+    const onRetry = async () => {
+        const networkStatus = await checkNetwork();
+        if (networkStatus) {
+            setIsConnected(true);
         }
+    };
     
-        
+    useEffect(() => {
+        const unsubscribe = NetInfo.addEventListener(state => {
+            setIsConnected(state.isConnected);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    const login = async (username, password) => {
+      console.log(username,password,"data")
+        setIsLoading(true);
+        if (!isConnected) {
+            setIsLoading(false);
+            return;
+        }
+
+        try {
+            // Determine if the input is a mobile number (10 digits) or employee ID
+            // const isMobileNumber = /^\d{10}$/.test(username);
+            
+            const payload =  
+                {
+                    mobile_number: username,
+                    pin:password ,
+                  }
+                // : {
+                //     emp_id: username,
+                //     pin: password,
+                //   };
+
+          
+            const url = await userLoginURL();
+            const response = await publicAxiosRequest.post(url, payload, {
+                headers: { 'Content-Type': 'application/json' },
+            });
+          
+          
+            if (response.status === 200) {
+                const { token, emp_id, e_id } = response.data;
+              await AsyncStorage.setItem('userToken', token);
+              // await AsyncStorage.setItem('empId', emp_id);
+              // await AsyncStorage.setItem('eId', String(e_id));
+              await AsyncStorage.setItem('mobileNumber', username);
+              await AsyncStorage.setItem('userPin', password);
+                }
+
+                router.replace({ pathname: 'home' });
+        } catch (err) {
+            console.log('Login error:', err);
+          }
+          
+        // try {
+        //     if (!username.includes("@")) {
+        //         const userDetailResponse = await axios.get(`https://www.atomwalk.com/api/get_user_detail/?user_id=${username}`);
+        //         username = userDetailResponse.data.username;
+        //     }
+        //     const res = await publicAxiosRequest.post(loginURL, { username, password });
+        //     const userToken = res.data['key'];
+        //     await AsyncStorage.multiSet([
+        //         ['userToken', userToken],
+        //         ['Password', password],
+        //         ['username', username],
+        //     ]);
+        //     setUserToken(userToken);
+        //     router.replace({ pathname: 'home' });
+        // } catch (err) {
+        //     console.log('Login error:', err);
+        // }
+
+        // try {
+        //     const res = await getCompanyInfo();
+        //     const companyInfo = res.data;
+        //     const db_name = companyInfo.db_name.substr(3);
+        //     await AsyncStorage.multiSet([
+        //         ['companyInfo', JSON.stringify(companyInfo)],
+        //         ['dbName', db_name],
+        //     ]);
+        //     setCompanyInfo(companyInfo);
+        //     setDbName(db_name);
+        // } catch (error) {
+        //     console.log('Company Info Fetch Error:', error);
+        // }
+
         setIsLoading(false);
-    }
+    };
 
     const logout = () => {
         setIsLoading(true);
         AsyncStorage.removeItem('userToken');
         AsyncStorage.removeItem('companyInfo');
-        AsyncStorage.removeItem('dbName');
-        
-        setUserToken(null);
+        // AsyncStorage.removeItem('dbName');
+            setUserToken(null);
         setCompanyInfo([]);
-        setDbName(null);
-        setIsLoading(false);
-        setError('')
-        router.replace('AuthScreen')
-    }
+        // setDbName(null);
+            setIsLoading(false);
+        // setError('')
+        router.replace('AuthScreen');
+    };
 
+    const isLoggedIn = async () => {
+            const networkStatus = await checkNetwork();
+            if (!networkStatus) {
+                return;
+            }
 
-  const isLoggedIn = async() => {
-    try {
-        setIsLoading(true);
-        let userToken = await AsyncStorage.getItem('userToken');
-        setUserToken(userToken);
-            
-        let dbName = await AsyncStorage.getItem('dbName');
-        setDbName(dbName);
-        
-        let companyInfo = await AsyncStorage.getItem('companyInfo');
-        
-        companyInfo = JSON.parse(companyInfo);
-        // console.log('isLoggedin',companyInfo);
-        if (companyInfo){
-            setCompanyInfo(companyInfo);
+        try {
+            setIsLoading(true);
+            const userToken = await AsyncStorage.getItem('userToken');
+            if (!userToken) {
+                router.replace('AuthScreen');
+                return;
+            }
+
+            setUserToken(userToken);
+
+            // Retrieve all stored data
+            const [
+                companyInfo,
+                dbName,
+                loginType,
+                identifier
+            ] = await Promise.all([
+                AsyncStorage.getItem('companyInfo'),
+                AsyncStorage.getItem('dbName'),
+                AsyncStorage.getItem('loginType'),
+                AsyncStorage.getItem(loginType === 'mobile' ? 'mobileNumber' : 'empId')
+            ]);
+
+            if (companyInfo) {
+                setCompanyInfo(JSON.parse(companyInfo));
+            }
+            if (dbName) {
+                setDbName(dbName);
+            }
+        } catch (e) {
+            console.log('Login Status Error:', e);
+        } finally {
+            setIsLoading(false);
         }
-        setError('');
-        setIsLoading(false);
-    } catch (e) {
-        console.log(`Logged In Error ${e}`);
-        setError(`Logged In Error ${e}`)
-    }
-}
+    };
 
-useEffect( () => {
-    isLoggedIn();
-}, []);
+    useEffect(() => {
+        isLoggedIn();
+    }, []);
 
-  return (
-    <AppContext.Provider value={{ state, login, logout, isLoading, userToken, companyInfo, dbName, error,setRefs,refs }}>
-      {children}
-    </AppContext.Provider>
-  );
+    return (
+        <AppContext.Provider value={{
+            login,
+            logout,
+            isLoading,
+            userToken,
+            companyInfo,
+            dbName,
+            isConnected,
+            checkNetwork,
+            setIsLoading
+        }}>
+            {children}
+            <NetworkErrorModal
+                visible={!isConnected} 
+                onRetry={onRetry} 
+                onNetworkRestore={() => setIsConnected(true)} 
+            />
+        </AppContext.Provider>
+    );
 };
 
 export { AppContext, AppProvider };

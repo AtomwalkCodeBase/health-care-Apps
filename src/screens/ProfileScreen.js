@@ -1,26 +1,39 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { MaterialCommunityIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, FontAwesome, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { AppContext } from '../../context/AppContext';
 import { getProfileInfo } from '../services/authServices';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../components/Header';
 import { useRouter } from 'expo-router';
 import Animated, { FadeIn, FadeOut, SlideInLeft } from 'react-native-reanimated';
+import { Switch } from 'react-native';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const ProfileScreen = () => {
     const { logout } = useContext(AppContext);
     const [profile, setProfile] = useState({});
     const [isManager, setIsManager] = useState(false);
     const [userPin, setUserPin] = useState(null);
+    const [biometricEnabled, setBiometricEnabled] = useState(false);
+    const [isBiometricModalVisible, setIsBiometricModalVisible] = useState(false);
+    const [pendingBiometricValue, setPendingBiometricValue] = useState(null);
     const router = useRouter();
 
+    // Load user pin and biometric setting from AsyncStorage
     useEffect(() => {
-        const fetchUserPin = async () => {
-            const storedPin = await AsyncStorage.getItem('userPin');
-            setUserPin(storedPin);
+        const fetchUserData = async () => {
+            try {
+                const storedPin = await AsyncStorage.getItem('userPin');
+                setUserPin(storedPin);
+
+                const biometric = await AsyncStorage.getItem('userBiometric');
+                setBiometricEnabled(biometric === 'true'); // Convert string to boolean
+            } catch (error) {
+                console.error('Error loading user data:', error);
+            }
         };
-        fetchUserPin();
+        fetchUserData();
     }, []);
 
     useEffect(() => {
@@ -33,6 +46,54 @@ const ProfileScreen = () => {
     const handlePressPassword = () => {
         router.push({ pathname: 'ResetPassword' });
     };
+
+    const handleBack = () => {
+        navigation.goBack();
+    };
+
+    const confirmBiometricToggle = async () => {
+    try {
+      setBiometricEnabled(pendingBiometricValue);
+      if (pendingBiometricValue) {
+        await AsyncStorage.setItem('userBiometric', 'true');
+      } else {
+        await AsyncStorage.removeItem('userBiometric');
+      }
+    } catch (error) {
+      console.error('Error updating biometric setting:', error);
+      setBiometricEnabled(!pendingBiometricValue); // Revert on error
+      setError({ visible: true, message: 'Failed to update biometric setting' });
+    } finally {
+      setIsBiometricModalVisible(false);
+      setPendingBiometricValue(null);
+    }
+    };
+
+    // Handle biometric toggle change
+    // const handleBiometricToggle = async (value) => {
+    //     try {
+    //         setBiometricEnabled(value);
+    //         if (value) {
+    //             await AsyncStorage.setItem('userBiometric', 'true');
+    //         } else {
+    //             await AsyncStorage.removeItem('userBiometric'); // Remove key when disabled
+    //         }
+    //     } catch (error) {
+    //         console.error('Error updating biometric setting:', error);
+    //         // Revert state if AsyncStorage fails
+    //         setBiometricEnabled(!value);
+    //     }
+    // };
+const handleBiometricToggle = (value) => {
+    setPendingBiometricValue(value); // Store the intended toggle value
+    setIsBiometricModalVisible(true); // Show confirmation modal
+  };
+
+    // Cancel biometric toggle
+  const cancelBiometricToggle = () => {
+    setIsBiometricModalVisible(false);
+    setPendingBiometricValue(null);
+  };
 
     return (
         <View style={styles.container}>
@@ -166,6 +227,24 @@ const ProfileScreen = () => {
 
                     {/* Action Items */}
                     <View style={styles.cardSection}>
+                        <View style={styles.optionItem}>
+                            <View style={styles.optionIconContainer}>
+                                <MaterialIcons name="fingerprint" size={30} color="#2a7fba" />
+                            </View>
+                            <View style={styles.optionTextContainer}>
+                                <Text style={styles.optionText}>Biometric Authentication</Text>
+                                <Text style={styles.optionDescription}>
+                                    Use fingerprint or face ID to log in
+                                </Text>
+                            </View>
+                            <Switch
+                                value={biometricEnabled}
+                                onValueChange={handleBiometricToggle}
+                                trackColor={{ false: '#eee', true: '#2a7fba' }}
+                                thumbColor={biometricEnabled ? '#fff' : '#ffffff'}
+                            />
+                        </View>
+                        <View style={styles.divider} />
                         {/* Set/Update Pin moved to the top of action items */}
                         <TouchableOpacity
                             style={styles.actionItem}
@@ -207,6 +286,15 @@ const ProfileScreen = () => {
                         </TouchableOpacity>
                     </View>
                 </Animated.View>
+                <ConfirmationModal
+                    visible={isBiometricModalVisible}
+                    message={`Are you sure you want to ${pendingBiometricValue ? 'enable' : 'disable'
+                        } biometric authentication?`}
+                    onConfirm={confirmBiometricToggle}
+                    onCancel={cancelBiometricToggle}
+                    confirmText={pendingBiometricValue ? 'Enable' : 'Disable'}
+                    cancelText="Cancel"
+                />
             </ScrollView>
         </View>
     );
@@ -354,6 +442,35 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: '#f0f0f0',
         marginVertical: 5,
+    },
+    optionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        // paddingHorizontal: 6,
+        backgroundColor: "#ffffff"
+    },
+    optionIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: "#ffffff",
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    optionTextContainer: {
+        flex: 1,
+    },
+    optionText: {
+        fontSize: 15,
+        fontWeight: '500',
+        color: "#000",
+    },
+    optionDescription: {
+        fontSize: 12,
+        color: "#95a5a6",
+        marginTop: 2,
     },
 });
 

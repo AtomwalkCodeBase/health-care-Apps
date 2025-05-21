@@ -219,7 +219,7 @@ const AppointmentCard = ({ appointment, onUpdate, onDelete, isCancelled, isPast,
 
 const TabButton = ({ active, label, onPress, tabWidth }) => (
   <TouchableOpacity
-    style={[styles.tabButton, active && styles.activeTabButton]}
+    style={[styles.tabButton, active && styles.activeTabButton, { width: tabWidth }]}
     onPress={onPress}
     activeOpacity={0.7}
   >
@@ -256,32 +256,41 @@ export const fetchBookedAppointments = async () => {
     };
 
     bookingsArray.forEach(booking => {
-      if (!booking) return;
+      if (!booking || !booking.customer_data || !booking.equipment_data) {
+        console.warn('Skipping invalid booking:', booking);
+        return;
+      }
+
+      if (booking.customer_data.id.toString() !== customerId) {
+        console.warn(`Skipping booking for different customer: ${booking.customer_data.id}`);
+        return;
+      }
       
       const bookingDate = parseFullDate(booking.booking_date);
-      const status = booking.status_display || 'upcoming';
+      const status = booking.status_display?.toLowerCase() || 'booked';
       
       const appointment = {
         id: booking.id?.toString() || `${Date.now()}-${Math.random()}`,
         booking_id: booking.booking_id?.toString() || booking.id?.toString(),
-        doctorName: booking.equipment_data?.name || 'Unknown Equipment',
-        specialty: booking.equipment_data?.equipment_type || 'Unknown Type',
-        date: booking.booking_date || new Date().toISOString(),
+        doctorName: booking.equipment_data.name || 'Unknown Doctor',
+        specialty: booking.equipment_data.equipment_type || 'Unknown Specialty',
+        date: booking.booking_date || new Date().toISOString().split('T')[0],
         time: normalizeTime(booking.start_time, booking.end_time),
-        image: booking.equipment_data?.image || "https://via.placeholder.com/100",
-        status: status.toLowerCase(),
+        image: booking.equipment_data.image || "https://via.placeholder.com/100",
+        status: status,
         start_time: booking.start_time,
         end_time: booking.end_time,
-        duration: booking.duration,
-        equipment_id: booking.equipment_data?.id?.toString(),
+        duration: parseFloat(booking.duration) || 1.0,
+        doctor_id: booking.equipment_data.id?.toString(),
+        customer_id: booking.customer_data.id?.toString(),
       };
 
-      if (!appointment.booking_id) {
-        console.warn('Skipping booking with missing booking_id:', booking);
+      if (!appointment.booking_id || !appointment.customer_id) {
+        console.warn('Skipping booking with missing booking_id or customer_id:', booking);
         return;
       }
 
-      if (status.toLowerCase() === 'cancelled') {
+      if (status === 'cancelled') {
         appointments.cancelled.push(appointment);
       } else {
         const appointmentDateTime = parseDateTimeForComparison(booking.booking_date, booking.start_time);
@@ -395,7 +404,7 @@ export const fetchBookedAppointments = async () => {
     return appointments;
   } catch (error) {
     console.error('Error fetching booked appointments:', error);
-    return { upcoming: [], past: [], cancelled: [] };
+    throw error;
   }
 };
 
@@ -518,7 +527,7 @@ const CustomModal = ({
 };
 
 export default function MyAppointments() {
-  const { tab = 'upcoming' } = useLocalSearchParams();
+  const { tab = 'upcoming', customerId } = useLocalSearchParams();
   const [activeTab, setActiveTab] = useState(tab);
   const [isModalVisible, setModalVisible] = useState(false);
   const [data, setData] = useState('');
@@ -539,9 +548,18 @@ export default function MyAppointments() {
   const TAB_WIDTH = SCREEN_WIDTH / TAB_COUNT;
 
   useEffect(() => {
-    setActiveTab(tab);
-    scrollToTab(tab);
-  }, [tab]);
+    const validateCustomerId = async () => {
+      const storedCustomerId = await AsyncStorage.getItem("Customer_id");
+      if (!storedCustomerId || (customerId && storedCustomerId !== customerId)) {
+        alert("Invalid or missing customer ID. Please log in.");
+        router.push("/login");
+        return;
+      }
+      setActiveTab(tab);
+      scrollToTab(tab);
+    };
+    validateCustomerId();
+  }, [tab, customerId]);
 
   const scrollToTab = (tabName) => {
     const index = ['upcoming', 'past', 'cancelled'].indexOf(tabName);
@@ -579,28 +597,26 @@ export default function MyAppointments() {
     }
 
     try {
-      const customerId = await AsyncStorage.getItem("Customer_id");
-      if (!customerId) throw new Error("Customer ID not found. Please log in.");
+      const storedCustomerId = await AsyncStorage.getItem("Customer_id");
+      if (!storedCustomerId) throw new Error("Customer ID not found. Please log in.");
 
-      // Validate required fields
       if (!appointment.booking_id) {
         throw new Error(`Invalid Booking ID for appointment: ${appointment.id}`);
       }
-      if (!appointment.equipment_id) throw new Error("Equipment ID is missing.");
+      if (!appointment.doctor_id) throw new Error("Doctor ID is missing.");
       if (!appointment.date) throw new Error("Booking date is missing.");
       if (!appointment.start_time || !appointment.end_time) {
         throw new Error("Start time or end time is missing.");
       }
       if (!appointment.duration) throw new Error("Duration is missing.");
 
-      // Validate booking_id format (optional, based on expected format like B_YYYYMMDD_NNNN)
       if (!appointment.booking_id.match(/^B_\d{8}_\d+$/)) {
         throw new Error(`Invalid Booking ID format: ${appointment.booking_id}. Expected format like B_YYYYMMDD_NNNN.`);
       }
 
       console.log("Cancelling Appointment:", {
-        customer_id: parseInt(customerId),
-        equipment_id: parseInt(appointment.equipment_id),
+        customer_id: parseInt(storedCustomerId),
+        doctor_id: parseInt(appointment.doctor_id),
         booking_date: appointment.date,
         start_time: appointment.start_time,
         end_time: appointment.end_time,
@@ -610,8 +626,8 @@ export default function MyAppointments() {
       });
 
       const response = await doctorBookingView(
-        parseInt(customerId),
-        parseInt(appointment.equipment_id),
+        parseInt(storedCustomerId),
+        parseInt(appointment.doctor_id),
         appointment.date,
         appointment.start_time,
         appointment.end_time,
@@ -626,7 +642,7 @@ export default function MyAppointments() {
         setCancelClick(false);
         setActiveTab('cancelled');
         scrollToTab('cancelled');
-        setCancelSuccessModalVisible(true); // Show success modal
+        setCancelSuccessModalVisible(true);
       } else {
         throw new Error('Failed to cancel the appointment. Unexpected response.');
       }
@@ -635,9 +651,8 @@ export default function MyAppointments() {
       let errorMessage = 'Failed to cancel appointment. Please try again.';
       if (error.response) {
         console.error('Server Error Response:', JSON.stringify(error.response.data, null, 2));
-        if (error.response.data.message.includes('Booking record not found')) {
+        if (error.response.data.message?.includes('Booking record not found')) {
           errorMessage = `Booking ID ${appointment.booking_id} not found. It may have been cancelled or does not exist.`;
-          // Refresh appointments to sync with server
           await refresh();
         } else {
           errorMessage = error.response.data.message || errorMessage;
@@ -659,7 +674,7 @@ export default function MyAppointments() {
           pathname: "/DateTime",
           params: {
             booking_id: appointment.booking_id,
-            id: appointment.equipment_id,
+            id: appointment.doctor_id,
             name: appointment.doctorName,
             specialty: appointment.specialty,
             image: appointment.image,
@@ -722,7 +737,7 @@ export default function MyAppointments() {
         return;
       }
 
-      const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+      const endDate = new Date(startDate.getTime() + appointment.duration * 60 * 60 * 1000);
 
       const eventDetails = {
         title: `Appointment with ${appointment.doctorName}`,
@@ -803,7 +818,7 @@ export default function MyAppointments() {
 
   return (
     <View style={styles.container}>
-      <Header title="My Appointments" />
+      <Header title="My Appointments" showBackButton onBackPress={() => router.push("/home")} />
       
       <View style={styles.tabContainer} ref={tabContainerRef}>
         <TabButton 
@@ -812,6 +827,7 @@ export default function MyAppointments() {
           onPress={() => {
             setActiveTab('upcoming');
             scrollToTab('upcoming');
+            router.push({ pathname: "/book", params: { tab: 'upcoming', customerId } });
           }}
           tabWidth={TAB_WIDTH}
         />
@@ -821,6 +837,7 @@ export default function MyAppointments() {
           onPress={() => {
             setActiveTab('past');
             scrollToTab('past');
+            router.push({ pathname: "/book", params: { tab: 'past', customerId } });
           }}
           tabWidth={TAB_WIDTH}
         />
@@ -830,6 +847,7 @@ export default function MyAppointments() {
           onPress={() => {
             setActiveTab('cancelled');
             scrollToTab('cancelled');
+            router.push({ pathname: "/book", params: { tab: 'cancelled', customerId } });
           }}
           tabWidth={TAB_WIDTH}
         />
@@ -937,7 +955,6 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   tabButton: {
-    flex: 1,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',

@@ -20,3 +20,9 @@ export const checkToken = async () => {
   };
   return false
 };
+
+export const getCustomerId = async () => {
+  const customer_id = await AsyncStorage.getItem("Customer_id");
+  console.log('customer id', customer_id);
+  return customer_id;
+};
