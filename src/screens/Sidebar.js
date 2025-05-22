@@ -1,10 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { router } from "expo-router";
 
+const Sidebar = ({ profile, onNavigate, onLogout, onClose }) => {
+  const [activeItem, setActiveItem] = useState("Homepage");
 
-const Sidebar = ({ profile, onNavigate, onLogout }) => {
+  const handleNavigation = (route, label) => {
+    setActiveItem(label);
+    onClose?.();
+    if (route !== "/home") {
+      router.push(route);
+    }
+  };
+
   return (
     <View style={styles.sidebarContainer}>
       {/* Profile Section */}
@@ -18,7 +27,7 @@ const Sidebar = ({ profile, onNavigate, onLogout }) => {
         )}
         <View style={styles.profileInfo}>
           <Text style={styles.profileName}>
-            {profile?.emp_data?.name ? profile.emp_data.name : ""}
+            {profile?.emp_data?.name ? profile.emp_data.name : "User"}
           </Text>
           <Text style={styles.profileEmail}>
             {profile?.email ? profile.email : ""}
@@ -28,24 +37,84 @@ const Sidebar = ({ profile, onNavigate, onLogout }) => {
 
       {/* Menu Items */}
       <View style={styles.menuSection}>
-        <SidebarItem icon="home-outline" label="Homepage" onPress={() => router.push("/home")} />
-        <SidebarItem icon="bell-outline" label="Notifications" onPress={() => router.push("/Notifications")} />
-        <SidebarItem icon="file-document-outline" label="My Reports" onPress={() => router.push("/Reports")} />
-        <SidebarItem icon="clipboard-text-outline" label="My Tasks" onPress={() => router.push("/TaskCategory")} />
-        <SidebarItem icon="stethoscope" label="Medical Records" onPress={() => router.push("MedicalRecords")} />
-        <SidebarItem icon="bed-outline" label="In-Patient System" onPress={() => router.push("InPatientSystem")} />
+        <SidebarItem 
+          icon="home-outline" 
+          label="Homepage" 
+          active={activeItem === "Homepage"}
+          onPress={() => handleNavigation("/home", "Homepage")} 
+        />
+        <SidebarItem 
+          icon="bell-outline" 
+          label="Notifications" 
+          active={activeItem === "Notifications"}
+          onPress={() => handleNavigation("/Notifications", "Notifications")} 
+        />
+        <SidebarItem 
+          icon="file-document-outline" 
+          label="My Reports" 
+          active={activeItem === "My Reports"}
+          onPress={() => handleNavigation("/Reports", "My Reports")} 
+        />
+        <SidebarItem 
+          icon="clipboard-text-outline" 
+          label="My Tasks" 
+          active={activeItem === "My Tasks"}
+          onPress={() => handleNavigation("/TaskCategory", "My Tasks")} 
+        />
+        <SidebarItem 
+          icon="stethoscope" 
+          label="Medical Records" 
+          active={activeItem === "Medical Records"}
+          onPress={() => handleNavigation("MedicalRecords", "Medical Records")} 
+        />
+        <SidebarItem 
+          icon="bed-outline" 
+          label="In-Patient System" 
+          active={activeItem === "In-Patient System"}
+          onPress={() => handleNavigation("InPatientSystem", "In-Patient System")} 
+        />
       </View>
 
       {/* Other Section */}
       <Text style={styles.otherLabel}>OTHER</Text>
       <View style={styles.menuSection}>
-        <SidebarItem icon="cog-outline" label="Setting" onPress={() => onNavigate("Setting")} highlight />
-        <SidebarItem icon="email-outline" label="Support" onPress={() => onNavigate("Support")} />
-        <SidebarItem icon="information-outline" label="About us" onPress={() => onNavigate("AboutUs")} />
+        <SidebarItem 
+          icon="cog-outline" 
+          label="Setting" 
+          active={activeItem === "Setting"}
+          onPress={() => {
+            setActiveItem("Setting");
+            onClose?.();
+            onNavigate("Setting");
+          }} 
+        />
+        <SidebarItem 
+          icon="email-outline" 
+          label="Support" 
+          active={activeItem === "Support"}
+          onPress={() => {
+            setActiveItem("Support");
+            onClose?.();
+            onNavigate("Support");
+          }} 
+        />
+        <SidebarItem 
+          icon="information-outline" 
+          label="About us" 
+          active={activeItem === "About us"}
+          onPress={() => {
+            setActiveItem("About us");
+            onClose?.();
+            onNavigate("AboutUs");
+          }} 
+        />
       </View>
 
       {/* Logout */}
-      <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
+      <TouchableOpacity style={styles.logoutButton} onPress={() => {
+        onClose?.();
+        onLogout();
+      }}>
         <MaterialCommunityIcons name="logout" size={22} color="#EF4444" />
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
@@ -53,14 +122,20 @@ const Sidebar = ({ profile, onNavigate, onLogout }) => {
   );
 };
 
-const SidebarItem = ({ icon, label, onPress, highlight }) => (
+const SidebarItem = ({ icon, label, onPress, active }) => (
   <TouchableOpacity
-    style={[styles.menuItem, highlight && styles.menuItemHighlight]}
+    style={[styles.menuItem, active && styles.menuItemHighlight]}
     onPress={onPress}
     activeOpacity={0.7}
   >
-    <MaterialCommunityIcons name={icon} size={22} color={highlight ? "#2a7fba" : "#555"} />
-    <Text style={[styles.menuLabel, highlight && styles.menuLabelHighlight]}>{label}</Text>
+    <MaterialCommunityIcons 
+      name={icon} 
+      size={22} 
+      color={active ? "#2a7fba" : "#555"} 
+    />
+    <Text style={[styles.menuLabel, active && styles.menuLabelHighlight]}>
+      {label}
+    </Text>
   </TouchableOpacity>
 );
 

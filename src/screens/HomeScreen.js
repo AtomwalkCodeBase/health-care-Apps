@@ -9,7 +9,8 @@ import {
   Dimensions,
   ScrollView,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  Animated
 } from "react-native";
 import { router } from "expo-router";
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
@@ -18,7 +19,7 @@ import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityI
 import { getemployelistview } from "../services/productServices";
 import { getAppointments, subscribeToAppointments, fetchBookedAppointments } from "./MyAppointments";
 import { StatusBar } from "expo-status-bar";
-import Sidebar from "./Sidebar"; // <-- Add this import
+import Sidebar from "./Sidebar";
 
 const COLORS = {
   primary: "#2a7fba",
@@ -62,7 +63,6 @@ const serviceList = [
   { name: "Urology", icon: "water" },
 ].sort((a, b) => a.name.localeCompare(b.name));
 
-// Memoized ServiceCard
 const ServiceCard = React.memo(({ item, isSelected, onPress }) => (
   <TouchableOpacity
     style={[
@@ -82,7 +82,6 @@ const ServiceCard = React.memo(({ item, isSelected, onPress }) => (
   </TouchableOpacity>
 ));
 
-// Memoized DoctorCard
 const DoctorCard = React.memo(({ item, onPress }) => (
   <TouchableOpacity
     style={styles.doctorCard}
@@ -124,14 +123,13 @@ const HomeScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [appointmentLoading, setAppointmentLoading] = useState(false);
   const [animatedPlaceholder, setAnimatedPlaceholder] = useState(STRINGS.searchBase);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
+  
   const animationRef = useRef(null);
   const isTypingRef = useRef(true);
   const currentIndexRef = useRef(0);
+  const sidebarAnim = useRef(new Animated.Value(-300)).current;
 
-  // --- Sidebar state ---
-  const [sidebarVisible, setSidebarVisible] = useState(false);
-
-  // Data loading
   const loadAppointmentsData = useCallback(async () => {
     try {
       setAppointmentLoading(true);
@@ -165,7 +163,6 @@ const HomeScreen = () => {
     }
   }, [loadAppointmentsData]);
 
-  // Initial load and subscription
   useEffect(() => {
     loadData();
     const unsubscribe = subscribeToAppointments(setAppointments);
@@ -175,7 +172,6 @@ const HomeScreen = () => {
     };
   }, [loadData]);
 
-  // Typing animation
   useEffect(() => {
     const typeText = () => {
       if (isTypingRef.current) {
@@ -209,7 +205,23 @@ const HomeScreen = () => {
     };
   }, []);
 
-  // Filtering and sorting
+  const toggleSidebar = () => {
+    if (sidebarVisible) {
+      Animated.timing(sidebarAnim, {
+        toValue: -300,
+        duration: 250,
+        useNativeDriver: true,
+      }).start(() => setSidebarVisible(false));
+    } else {
+      setSidebarVisible(true);
+      Animated.timing(sidebarAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+
   const { filteredServices, filteredDoctors } = useMemo(() => {
     const lowerText = searchText.toLowerCase();
     const matchedServices = serviceList.filter(service =>
@@ -231,7 +243,6 @@ const HomeScreen = () => {
     return { filteredServices: matchedServices, filteredDoctors: matchedDoctors };
   }, [searchText, isAscending, doctorList, selectedService]);
 
-  // Handlers
   const handleServicePress = useCallback((serviceName) => {
     setSelectedService(selectedService === serviceName ? null : serviceName);
   }, [selectedService]);
@@ -254,7 +265,6 @@ const HomeScreen = () => {
     });
   }, []);
 
-  // Loading state
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
@@ -264,7 +274,6 @@ const HomeScreen = () => {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <View style={styles.errorContainer}>
@@ -284,188 +293,171 @@ const HomeScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
-      {/* Header */}
-      <View style={styles.headerContainer}>
-        <View style={styles.topRow}>
-          {/* --- Profile area: make it open the sidebar --- */}
-          <TouchableOpacity
-            style={styles.profileContainer}
-            onPress={() => setSidebarVisible(true)}
-            activeOpacity={0.7}
-          >
-            {profile?.image ? (
-              <Image 
-                source={{ uri: profile.image }} 
-                style={styles.profileImage}
-              />
-            ) : (
-              <View style={[styles.profileImage, styles.placeholderImage]}>
-                <MaterialCommunityIcons name="account" size={24} color="#ccc" />
-              </View>
-            )}
-            <View style={styles.profileTextContainer}>
-              <Text style={styles.welcomeText}>Welcome</Text>
-              <Text style={styles.userName}>{STRINGS.greeting(profile?.emp_data?.name)}</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.bookNowButton}
-            onPress={() => router.push("/BookingAppointment")}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons name="plus" size={16} color="#fff" />
-            <Text style={styles.bookNowText}>{STRINGS.bookNow}</Text>
-          </TouchableOpacity>
-        </View>
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <MaterialCommunityIcons name="magnify" size={20} color="#777" />
-          <TextInput
-            placeholder={animatedPlaceholder}
-            placeholderTextColor="#999"
-            style={styles.searchInput}
-            value={searchText}
-            onChangeText={setSearchText}
-          />
-          <TouchableOpacity 
-            onPress={() => setIsAscending(!isAscending)}
-            style={styles.filterButton}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons
-              name={isAscending ? "sort-alphabetical-ascending" : "sort-alphabetical-descending"}
-              size={20}
-              color="#777"
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-      {/* Main Content */}
-      <ScrollView 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[COLORS.primary]}
-          />
-        }
-      >
-        {/* Appointments */}
-        {appointmentLoading ? (
-          <View style={styles.sectionLoading}>
-            <ActivityIndicator size="small" color={COLORS.primary} />
-            <Text style={styles.sectionLoadingText}>{STRINGS.appointmentLoading}</Text>
-          </View>
-        ) : (
-          appointments.upcoming?.length > 0 && (
-            <View>
-              <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
-              <FlatList
-                horizontal
-                data={appointments.upcoming}
-                renderItem={({ item }) => (
-                  <TouchableOpacity 
-                    style={styles.appointmentCard}
-                    activeOpacity={0.7}
-                  >
-                    {item.image ? (
-                      <Image 
-                        source={{ uri: item.image }} 
-                        style={styles.appointmentImage}
-                      />
-                    ) : (
-                      <View style={[styles.appointmentImage, styles.placeholderImage]}>
-                        <MaterialCommunityIcons name="account" size={24} color="#ccc" />
-                      </View>
-                    )}
-                    <View style={styles.appointmentInfo}>
-                      <Text style={styles.appointmentDoctorName}>{item.doctorName}</Text>
-                      <Text style={styles.appointmentDesignation}>{item.specialty}</Text>
-                      <Text style={styles.appointmentDateTime}>
-                        {item.date} at {item.time}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
-                keyExtractor={(item) => item.id}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.appointmentsList}
-                getItemLayout={(data, index) => (
-                  {length: Dimensions.get("window").width * 0.7, offset: Dimensions.get("window").width * 0.7 * index, index}
-                )}
-              />
-            </View>
-          )
-        )}
-        {/* Services */}
-        <Text style={styles.sectionTitle}>{STRINGS.servicesTitle}</Text>
-        <FlatList
-          horizontal
-          data={filteredServices}
-          renderItem={({ item }) => (
-            <ServiceCard 
-              item={item}
-              isSelected={selectedService === item.name}
-              onPress={() => handleServicePress(item.name)}
-            />
-          )}
-          keyExtractor={(item) => item.name}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.servicesContainer}
-          getItemLayout={(data, index) => (
-            {length: Dimensions.get("window").width * 0.4, offset: Dimensions.get("window").width * 0.4 * index, index}
-          )}
-        />
-        {/* Doctors */}
-        <Text style={styles.sectionTitle}>{STRINGS.doctorsTitle}</Text>
-        {filteredDoctors.length === 0 ? (
-          <Text style={styles.noResultsText}>{STRINGS.noDoctors}</Text>
-        ) : (
-          <FlatList
-            data={filteredDoctors}
-            renderItem={({ item }) => (
-              <DoctorCard item={item} onPress={() => handleDoctorPress(item)} />
-            )}
-            keyExtractor={(item) => item.id.toString()}
-            scrollEnabled={false}
-            contentContainerStyle={styles.verticalList}
-            getItemLayout={(data, index) => (
-              {length: 97, offset: 97 * index, index}
-            )}
-          />
-        )}
-      </ScrollView>
-      {/* --- Sidebar Overlay --- */}
+      
+      {/* Sidebar Animation */}
       {sidebarVisible && (
-        <View style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          flexDirection: "row",
-          zIndex: 99,
-        }}>
+        <Animated.View 
+          style={[
+            styles.sidebarWrapper,
+            { transform: [{ translateX: sidebarAnim }] }
+          ]}
+        >
           <Sidebar
             profile={profile}
-            onNavigate={(screen) => {
-              setSidebarVisible(false);
-              router.push("/" + screen);
-            }}
-            onLogout={() => {
-              setSidebarVisible(false);
-              // Add your logout logic here
-              router.replace("/Login");
-            }}
+            onNavigate={(screen) => router.push("/" + screen)}
+            onLogout={() => router.replace("/Login")}
+            onClose={toggleSidebar}
           />
-          <TouchableOpacity
-            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.2)" }}
-            activeOpacity={1}
-            onPress={() => setSidebarVisible(false)}
-          />
-        </View>
+        </Animated.View>
       )}
+      
+      {/* Overlay when sidebar is open */}
+      {sidebarVisible && (
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={toggleSidebar}
+        />
+      )}
+
+      {/* Main Content */}
+      <View style={styles.contentContainer}>
+        {/* Header */}
+        <View style={styles.headerContainer}>
+          <View style={styles.topRow}>
+            <TouchableOpacity
+              onPress={toggleSidebar}
+              activeOpacity={0.7}
+              style={styles.menuButton}
+            >
+              <MaterialCommunityIcons name="menu" size={32} color="#fff" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.bookNowButton}
+              onPress={() => router.push("/BookingAppointment")}
+              activeOpacity={0.7}
+            >
+              <View style={styles.bookNowIconWrapper}>
+                <MaterialCommunityIcons name="calendar-plus" size={22} color="#2a7fba" />
+              </View>
+              <Text style={styles.bookNowText}>{STRINGS.bookNow}</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <MaterialCommunityIcons name="magnify" size={20} color="#777" />
+            <TextInput
+              placeholder={animatedPlaceholder}
+              placeholderTextColor="#999"
+              style={styles.searchInput}
+              value={searchText}
+              onChangeText={setSearchText}
+            />
+            <TouchableOpacity 
+              onPress={() => setIsAscending(!isAscending)}
+              style={styles.filterButton}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons
+                name={isAscending ? "sort-alphabetical-ascending" : "sort-alphabetical-descending"}
+                size={20}
+                color="#777"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        {/* Scrollable Content */}
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[COLORS.primary]}
+            />
+          }
+        >
+          {/* Appointments */}
+          {appointmentLoading ? (
+            <View style={styles.sectionLoading}>
+              <ActivityIndicator size="small" color={COLORS.primary} />
+              <Text style={styles.sectionLoadingText}>{STRINGS.appointmentLoading}</Text>
+            </View>
+          ) : (
+            appointments.upcoming?.length > 0 && (
+              <View>
+                <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
+                <FlatList
+                  horizontal
+                  data={appointments.upcoming}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity 
+                      style={styles.appointmentCard}
+                      activeOpacity={0.7}
+                    >
+                      {item.image ? (
+                        <Image 
+                          source={{ uri: item.image }} 
+                          style={styles.appointmentImage}
+                        />
+                      ) : (
+                        <View style={[styles.appointmentImage, styles.placeholderImage]}>
+                          <MaterialCommunityIcons name="account" size={24} color="#ccc" />
+                        </View>
+                      )}
+                      <View style={styles.appointmentInfo}>
+                        <Text style={styles.appointmentDoctorName}>{item.doctorName}</Text>
+                        <Text style={styles.appointmentDesignation}>{item.specialty}</Text>
+                        <Text style={styles.appointmentDateTime}>
+                          {item.date} at {item.time}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  keyExtractor={(item) => item.id}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.appointmentsList}
+                />
+              </View>
+            )
+          )}
+          
+          {/* Services */}
+          <Text style={styles.sectionTitle}>{STRINGS.servicesTitle}</Text>
+          <FlatList
+            horizontal
+            data={filteredServices}
+            renderItem={({ item }) => (
+              <ServiceCard 
+                item={item}
+                isSelected={selectedService === item.name}
+                onPress={() => handleServicePress(item.name)}
+              />
+            )}
+            keyExtractor={(item) => item.name}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.servicesContainer}
+          />
+          
+          {/* Doctors */}
+          <Text style={styles.sectionTitle}>{STRINGS.doctorsTitle}</Text>
+          {filteredDoctors.length === 0 ? (
+            <Text style={styles.noResultsText}>{STRINGS.noDoctors}</Text>
+          ) : (
+            <FlatList
+              data={filteredDoctors}
+              renderItem={({ item }) => (
+                <DoctorCard item={item} onPress={() => handleDoctorPress(item)} />
+              )}
+              keyExtractor={(item) => item.id.toString()}
+              scrollEnabled={false}
+              contentContainerStyle={styles.verticalList}
+            />
+          )}
+        </ScrollView>
+      </View>
     </View>
   );
 };
@@ -474,6 +466,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  contentContainer: {
+    flex: 1,
+  },
+  sidebarWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 300,
+    zIndex: 100,
+    elevation: 20,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    zIndex: 99,
   },
   headerContainer: {
     backgroundColor: COLORS.primary,
@@ -491,52 +504,39 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 20,
+    marginTop: -8,
   },
-  profileContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  profileImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  placeholderImage: {
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderColor: '#ddd',
-  },
-  profileTextContainer: {
-    marginLeft: 12,
-  },
-  welcomeText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-  },
-  userName: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 2,
+  menuButton: {
+    padding: 12,
   },
   bookNowButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 8,
+    minWidth: 130,
+    justifyContent: 'center',
+  },
+  bookNowIconWrapper: {
+    backgroundColor: 'rgba(42, 127, 186, 0.1)',
+    borderRadius: 12,
+    padding: 4,
+    marginRight: 8,
   },
   bookNowText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 5,
+    color: '#2a7fba',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   searchContainer: {
     backgroundColor: COLORS.searchBackground,
@@ -717,6 +717,11 @@ const styles = StyleSheet.create({
   sectionLoadingText: {
     marginLeft: 10,
     color: COLORS.text,
+  },
+  placeholderImage: {
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
