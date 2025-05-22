@@ -22,7 +22,7 @@ export default function MiniPlayer({
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
 
-  // Reset progress when sound changes (i.e., when a new song is played)
+  // Reset progress when sound changes
   useEffect(() => {
     setPosition(0);
     setDuration(0);
@@ -32,26 +32,37 @@ export default function MiniPlayer({
     let interval;
     const updateProgress = async () => {
       if (sound && !isSeeking) {
-        const status = await sound.getStatusAsync();
-        if (status.isLoaded) {
-          setPosition(status.positionMillis);
-          setDuration(status.durationMillis);
+        try {
+          const status = await sound.getStatusAsync();
+          if (status.isLoaded) {
+            setPosition(status.positionMillis);
+            setDuration(status.durationMillis);
+          }
+        } catch (error) {
+          console.error('MiniPlayer progress update error:', error);
         }
       }
     };
 
     if (isPlaying && sound) {
       interval = setInterval(updateProgress, 500);
-      // Immediate update when starting
       updateProgress();
     }
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [sound, isPlaying, isSeeking]);
 
   const handleSeek = async (value) => {
     if (sound) {
-      await sound.setPositionAsync(value);
-      setPosition(value);
+      try {
+        await sound.setPositionAsync(value);
+        setPosition(value);
+      } catch (error) {
+        console.error('MiniPlayer seek error:', error);
+      }
     }
     setIsSeeking(false);
   };
@@ -83,20 +94,12 @@ export default function MiniPlayer({
         </View>
 
         <View style={styles.playerControls}>
-          <TouchableOpacity onPress={onPrevious} style={styles.controlButton}>
-            <Ionicons name="play-skip-back" size={24} color="#2a7fba" />
-          </TouchableOpacity>
-
           <TouchableOpacity onPress={onPlayPause} style={styles.playPauseButton}>
             <Ionicons
               name={isPlaying ? 'pause' : 'play'}
               size={28}
               color="#fff"
             />
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={onNext} style={styles.controlButton}>
-            <Ionicons name="play-skip-forward" size={24} color="#2a7fba" />
           </TouchableOpacity>
         </View>
       </View>
@@ -146,9 +149,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 10,
-  },
-  controlButton: {
-    padding: 8,
   },
   playPauseButton: {
     width: 44,
