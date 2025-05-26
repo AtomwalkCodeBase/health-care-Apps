@@ -68,7 +68,6 @@ export const getLeadStatusListURL = `${endpoint}/lead_status_list/${db_name}/`;
 export const getTaskTypeListURL = `${endpoint}/task_type_list/${db_name}/`;
 export const updateTaskInterestURL = `${endpoint}/update_task_interest/${db_name}/`;
 export const getOrderListURL = `${endpoint}/order_list/${db_name}/`;
-export const updateTaskURL = `${endpoint}/update_task/${db_name}/`;
 export const updateLeadStatusURL = `${endpoint}/update_lead_status/${db_name}/`;
 export const getUserListURL = `${endpoint}/user_list/${db_name}/`;
 export const getEmpLeavedata = `${endpoint}/get_employee_leave/${db_name}/`;
@@ -86,6 +85,12 @@ export const getClaimApproverList = `${endpoint}/get_claim_approve_list/${db_nam
 export const getemployeeList = async () => {
  const db_name = await getDbName();
   return `${endpoint}/get_employee_list/${db_name}/`;
+}
+
+// export const updateTaskURL = `${endpoint}/update_task/${db_name}/`;
+export const updateTaskURL = async () => {
+ const db_name = await getDbName();
+  return `${endpoint}/update_task/${db_name}/`;
 }
 
 // export const getequipmentList = `${endpoint}/get_facility_list/${db_name}/`;

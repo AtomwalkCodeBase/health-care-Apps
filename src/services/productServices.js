@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList, getemployeeList, getequipmentList, userLoginURL, getbookedList, doctorbooking, setuserpin, userTaskList, getTaskCategoryURL } from "../services/ConstantServies";
+import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList, getemployeeList, getequipmentList, userLoginURL, getbookedList, doctorbooking, setuserpin, userTaskList, getTaskCategoryURL, updateTaskURL } from "../services/ConstantServies";
 import { authAxios, authAxiosFilePost, authAxiosPost, authAxiosPosts } from "./HttpMethod";
 
 export function getEmpLeave(leave_type, emp_id, year) {
@@ -277,6 +277,18 @@ export async function customerLogin(payload) {
   const url = await userLoginURL(); 
   let data = payload;
   return authAxiosPosts(url, data);
+}
+
+export async function updateTask(task_data, is_completed='N') {
+    // console.log('updateTask', task_data, is_completed, assign_user)
+    let data = {};
+    data['task_data'] = task_data
+    data['is_completed'] = is_completed; 
+    // data['assign_user'] = assign_user; 
+    console.log("On call data===",data)
+    const url = await updateTaskURL();
+    
+    return authAxiosPost(url, data);
 }
 
 export async function setUserPinView(o_pin, n_pin) {

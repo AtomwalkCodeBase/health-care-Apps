@@ -19,86 +19,58 @@ const formatTime = (millis) => {
 };
 
 export default function VideoPlayer({ task, visible, onClose }) {
-  const [video, setVideo] = useState(null);
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [videoPosition, setVideoPosition] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
+  const [hasFinished, setHasFinished] = useState(false); 
   const videoRef = useRef(null);
 
   const cleanupVideo = async () => {
     try {
       if (videoRef.current) {
+        console.log('Cleaning up video');
         await videoRef.current.stopAsync();
-        await videoRef.current.unloadAsync();
-        videoRef.current = null;
-        setVideo(null);
-        setVideoPlaying(false);
-        setVideoPosition(0);
-        setVideoDuration(0);
       }
     } catch (error) {
       console.error('Video cleanup error:', error);
+    } finally {
+      setVideoPlaying(false);
+      setVideoPosition(0);
+      setVideoDuration(0);
+      setHasFinished(false);
     }
   };
 
   useEffect(() => {
-    let interval;
-    const updateProgress = async () => {
-      if (videoRef.current && videoPlaying && !isSeeking) {
-        try {
-          const status = await videoRef.current.getStatusAsync();
-          if (status.isLoaded) {
-            setVideoPosition(status.positionMillis || 0);
-            setVideoDuration(status.durationMillis || 0);
-          }
-        } catch (error) {
-          console.error('Video progress update error:', error);
-        }
-      }
-    };
-
-    if (videoPlaying && video) {
-      interval = setInterval(updateProgress, 500); // Matches MiniPlayer's interval
-      updateProgress();
-    }
-    return () => clearInterval(interval);
-  }, [video, videoPlaying, isSeeking]);
-
-  useEffect(() => {
     if (visible && task?.ref_file) {
-      const loadVideo = async () => {
-        try {
-          await cleanupVideo();
-          const newVideo = new Video({
-            source: { uri: task.ref_file },
-            shouldPlay: true,
-            progressUpdateIntervalMillis: 500,
-            onPlaybackStatusUpdate: handleVideoPlaybackStatusUpdate,
-          });
-          videoRef.current = newVideo;
-          setVideo(newVideo);
-          setVideoPlaying(true);
-        } catch (error) {
-          console.error('Video load error:', error);
-          Alert.alert('Error', 'Failed to load video');
-          onClose();
-        }
-      };
-      loadVideo();
+      setVideoPlaying(true);
     } else {
       cleanupVideo();
     }
-    return () => cleanupVideo();
+    return () => {
+      cleanupVideo();
+    };
   }, [visible, task]);
 
   const handleVideoPlaybackStatusUpdate = (status) => {
     if (status.isLoaded) {
-      setVideoPlaying(status.isPlaying);
-      if (status.didJustFinish) {
+      if (!isSeeking) {
+        setVideoPlaying(status.isPlaying);
+        setVideoPosition(status.positionMillis || 0);
+        setVideoDuration(status.durationMillis || 0);
+      }
+
+      if (status.didJustFinish && !hasFinished) {
+        console.log('Video finished');
+        setHasFinished(true);
         cleanupVideo();
         onClose();
       }
+    } else if (status.error) {
+      Alert.alert('Error', 'Video playback error');
+      cleanupVideo();
+      onClose();
     }
   };
 
@@ -113,23 +85,25 @@ export default function VideoPlayer({ task, visible, onClose }) {
         setVideoPlaying(true);
       }
     } catch (error) {
-      console.error('Video play/pause error:', error);
-      Alert.alert('Error', 'Failed to play/pause video');
+      Alert.alert('Error', 'Play/pause failed');
     }
   };
 
   const handleVideoSeek = async (value) => {
     if (!videoRef.current) return;
     try {
-      console.log('Seeking video to:', value);
+      setIsSeeking(true);
       await videoRef.current.setPositionAsync(value);
       setVideoPosition(value);
-      setIsSeeking(false);
-      console.log('Seek completed');
     } catch (error) {
-      console.error('Video seek error:', error);
+      console.error('Seek failed:', error);
+    } finally {
       setIsSeeking(false);
     }
+  };
+
+  const handleVideoLoad = (status) => {
+    setVideoDuration(status.durationMillis || 0);
   };
 
   return (
@@ -137,21 +111,21 @@ export default function VideoPlayer({ task, visible, onClose }) {
       animationType="slide"
       transparent={true}
       visible={visible}
-      onRequestClose={onClose}
+      onRequestClose={() => {
+        cleanupVideo();
+        onClose();
+      }}
     >
-      <TouchableOpacity
-        style={styles.modalContainer}
-        activeOpacity={1}
-        // onPress={onClose}
-      >
+      <TouchableOpacity style={styles.modalContainer} activeOpacity={1}>
         <View style={styles.modalContent}>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={onClose}
-          >
-            <Ionicons name="close-circle" size={40} color="#ff4d4d" />
+          <TouchableOpacity style={styles.closeButton} onPress={() => {
+            cleanupVideo();
+            onClose();
+          }}>
+            <Ionicons name="close-circle" size={35} color="#ff4d4d" />
           </TouchableOpacity>
-          {video && (
+
+          {visible && task?.ref_file && (
             <>
               <Video
                 ref={videoRef}
@@ -161,22 +135,18 @@ export default function VideoPlayer({ task, visible, onClose }) {
                 isMuted={false}
                 shouldPlay={videoPlaying}
                 useNativeControls={false}
+                onPlaybackStatusUpdate={handleVideoPlaybackStatusUpdate}
+                onLoad={handleVideoLoad}
+                progressUpdateIntervalMillis={500}
                 onError={(error) => {
-                  console.error('Video error:', error);
                   Alert.alert('Error', 'Failed to load video');
+                  cleanupVideo();
                   onClose();
                 }}
               />
               <View style={styles.videoControls}>
-                <TouchableOpacity
-                  onPress={handleVideoPlayPause}
-                  style={styles.playPauseButton}
-                >
-                  <Ionicons
-                    name={videoPlaying ? 'pause' : 'play'}
-                    size={28}
-                    color="#fff"
-                  />
+                <TouchableOpacity onPress={handleVideoPlayPause} style={styles.playPauseButton}>
+                  <Ionicons name={videoPlaying ? 'pause' : 'play'} size={28} color="#fff" />
                 </TouchableOpacity>
                 <Slider
                   style={styles.videoSlider}
@@ -228,7 +198,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 15,
     right: 15,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     borderRadius: 20,
     padding: 5,
     zIndex: 1,

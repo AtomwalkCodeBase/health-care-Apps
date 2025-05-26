@@ -73,6 +73,12 @@ const Sidebar = ({ profile, onNavigate, onLogout, onClose }) => {
           active={activeItem === "In-Patient System"}
           onPress={() => handleNavigation("InPatientSystem", "In-Patient System")} 
         />
+        <SidebarItem 
+          icon="file-document-outline" 
+          label="Feedback/Query" 
+          active={activeItem === "Feedback/Query"}
+          onPress={() => handleNavigation("Feedback", "Feedback/Query")}
+        />
       </View>
 
       {/* Other Section */}

@@ -22,6 +22,7 @@ export default function RootLayout() {
       <Stack.Screen name="Tasks/index" options={{headerShown:false}}/>
       <Stack.Screen name="TaskCategory/index" options={{headerShown:false}}/>
       <Stack.Screen name="AudioTask/index" options={{headerShown:false}}/>
+      {/* <Stack.Screen name="Feedback/index" options={{headerShown:false}}/> */}
 
     </Stack>
     </AppProvider>

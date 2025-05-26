@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,21 +8,19 @@ import {
   ActivityIndicator,
   StatusBar,
   Alert,
-  Image,
-  Modal,
-  BackHandler,
   AppState,
+  BackHandler,
 } from 'react-native';
 import { Audio } from 'expo-av';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import moment from 'moment';
 import { useRouter } from 'expo-router';
 import Header from '../components/Header';
-import { getusertasklistview, updateTaskStatus } from '../services/productServices';
+import { getusertasklistview, updateTask } from '../services/productServices';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Slider from '@react-native-community/slider';
 import MiniPlayer from '../components/MiniPlayer';
 import VideoPlayer from '../components/VideoPlayer';
+import TaskCard from '../components/TaskCards';
+import TASK_TYPE_CONFIG from '../components/TaskCards';
 
 const TAB_OPTIONS = [
   { key: 'today', label: 'Today' },
@@ -42,170 +40,33 @@ const getDateKey = (dateString) => {
   return null;
 };
 
-const TASK_TYPE_CONFIG = {
-  audio: {
-    icon: { name: 'musical-notes', library: 'Ionicons', size: 32 },
-    hasProgressBar: false,
-    primaryField: 'Therapy for',
-    primaryFieldKey: 'therapyFor',
-  },
-  video: {
-    icon: { name: 'videocam', library: 'Ionicons', size: 32 },
-    hasProgressBar: false,
-    primaryField: 'Therapy for',
-    primaryFieldKey: 'therapyFor',
-  },
-  medicine: {
-    icon: { name: 'pills', library: 'FontAwesome5', size: 28 },
-    hasProgressBar: false,
-    primaryField: 'Medicine for',
-    primaryFieldKey: 'therapyFor',
-    additionalFields: [
-      { label: 'Dose', key: 'dose' },
-      { label: 'Time', key: 'time' },
-    ],
-  },
-  default: {
-    icon: { name: 'help-circle', library: 'Ionicons', size: 32 },
-    hasProgressBar: false,
-    primaryField: 'Details',
-    primaryFieldKey: 'therapyFor',
-  },
-};
-
 // --- API: Mark as completed ---
-const markTaskAsCompleted = async (taskId, customerId) => {
+const markTaskAsCompleted = async (task, customerId) => {
   try {
-    await updateTaskStatus(taskId, customerId, 'Completed');
-    await new Promise((res) => setTimeout(res, 500));
+    if (!task?.id) {
+      throw new Error('Missing task ID');
+    }
+
+    const task_data = {
+      curr_user: customerId || '',
+      id: task.id,
+      name: task.name || 'Unnamed Task',
+      remarks: task.therapyFor || task.remarks || '',
+      start_time: null, // No start_time in current task data
+      task_date: task.date ? moment(task.date, 'YYYY-MM-DD').format('DD-MM-YYYY') : moment().format('DD-MM-YYYY'),
+      task_type: task.type ? task.type.toUpperCase() : 'GENERAL',
+    };
+
+    console.log('Marking task as completed:', { task_data, is_completed: 'Y' });
+
+    const response = await updateTask(task_data, 'Y');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    console.log('Task marked as completed successfully:', { taskId: task.id, response });
     return { success: true };
   } catch (error) {
-    throw new Error('Failed to mark task as completed');
+    console.error('Failed to mark task as completed:', error);
+    throw error;
   }
-};
-
-const TaskCard = ({ task, onPlayPress, onVideoPress, onCompletePress, isToday, isCurrentTrack, isPlaying, isLoading }) => {
-  const config = TASK_TYPE_CONFIG[task.type] || TASK_TYPE_CONFIG.default;
-  const isAudio = task.type === 'audio';
-  const isVideo = task.type === 'video';
-  const [imageModalVisible, setImageModalVisible] = useState(false);
-
-  const renderIcon = () => {
-    const { name, library, size } = config.icon;
-    if (library === 'Ionicons') {
-      return <Ionicons name={name} size={size} color="#2986cc" />;
-    } else if (library === 'FontAwesome5') {
-      return <FontAwesome5 name={name} size={size} color="#2986cc" />;
-    }
-    return null;
-  };
-
-  return (
-    <View style={[styles.card, isAudio && styles.audioCard, isVideo && styles.videoCard]}>
-      <View style={styles.cardIconWrap}>{renderIcon()}</View>
-      <View style={styles.cardContent}>
-        <Text style={styles.cardTitle}>{task.name}</Text>
-        <Text style={styles.cardSubtitle}>
-          {config.primaryField}: {task[config.primaryFieldKey] || 'N/A'}
-        </Text>
-        {config.additionalFields?.map((field) => (
-          <Text key={field.key} style={styles.cardSubtitle}>
-            {field.label}: {task[field.key] || 'N/A'}
-          </Text>
-        ))}
-        {config.hasProgressBar && (
-          <View style={styles.progressContainer}>
-            <Slider
-              style={styles.progressBar}
-              minimumValue={0}
-              maximumValue={100}
-              value={0}
-              minimumTrackTintColor="#2986cc"
-              maximumTrackTintColor="#e5e5e5"
-              thumbTintColor="#2a7fba"
-              disabled
-            />
-          </View>
-        )}
-      </View>
-      <View style={[styles.cardActions, (isAudio || isVideo) && styles.mediaCardActions]}>
-        {isToday && (
-          <>
-            {task.completed ? (
-              <View style={[styles.completeButton, styles.completeButtonDone, (isAudio || isVideo) && styles.mediaCompleteButton]}>
-                <Text style={styles.completeButtonText}>Completed</Text>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={[styles.completeButton, (isAudio || isVideo) && styles.mediaCompleteButton]}
-                onPress={() => onCompletePress(task.id)}
-              >
-                <Text style={styles.completeButtonText}>Mark Complete</Text>
-              </TouchableOpacity>
-            )}
-            {task.type === 'medicine' && task.ref_file && (
-              <TouchableOpacity
-                style={styles.viewButton}
-                onPress={() => setImageModalVisible(true)}
-              >
-                <Text style={styles.viewButtonText}>View</Text>
-              </TouchableOpacity>
-            )}
-            {isVideo && (
-              <TouchableOpacity
-                style={styles.viewButton}
-                onPress={() => onVideoPress(task)}
-              >
-                <Text style={styles.viewButtonText}>Play Video</Text>
-              </TouchableOpacity>
-            )}
-            {isAudio && (
-              <TouchableOpacity
-                style={[styles.viewButton, (isAudio || isVideo) && styles.mediaCompleteButton]}
-                onPress={() => onPlayPress(task)}
-                disabled={isLoading && isCurrentTrack}
-              >
-                <Text style={styles.viewButtonText}>
-                  {isPlaying && isCurrentTrack ? 'Pause Audio' : 'Play Audio'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </>
-        )}
-      </View>
-
-      {/* Modal for full-screen image view */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={imageModalVisible}
-        onRequestClose={() => setImageModalVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalContainer}
-          activeOpacity={1}
-          onPress={() => setImageModalVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setImageModalVisible(false)}
-            >
-              <Ionicons name="close-circle" size={30} color="#ff4d4d" />
-            </TouchableOpacity>
-            {task.ref_file && (
-              <Image
-                source={{ uri: task.ref_file }}
-                style={styles.fullImage}
-                resizeMode="contain"
-                onError={() => Alert.alert('Error', 'Failed to load image.')}
-              />
-            )}
-          </View>
-        </TouchableOpacity>
-      </Modal>
-    </View>
-  );
 };
 
 export default function PatientTasks() {
@@ -221,10 +82,16 @@ export default function PatientTasks() {
   const [duration, setDuration] = useState(0);
   const [videoTask, setVideoTask] = useState(null);
   const [videoModalVisible, setVideoModalVisible] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const seekingRef = useRef(false);
   const soundRef = useRef(null);
   const appStateRef = useRef(AppState.currentState);
   const router = useRouter();
+
+  // Debug videoModalVisible changes
+  useEffect(() => {
+    console.log('[PatientTasks] videoModalVisible changed:', videoModalVisible);
+  }, [videoModalVisible]);
 
   // Initialize audio session
   useEffect(() => {
@@ -313,18 +180,16 @@ export default function PatientTasks() {
     let hasMedia = false;
 
     if (type === 'ticket' || !TASK_TYPE_CONFIG[type]) {
-      if (apiTask.ref_file) {
-        if (apiTask.ref_file.includes('.mp3')) {
+      if (apiTask.task_sub_category_name) {
+        if (apiTask.task_sub_category_name === 'Audio') {
           type = 'audio';
           hasMedia = true;
-        } else if (apiTask.ref_file.includes('.mp4')) {
+        } else if (apiTask.task_sub_category_name === 'Video') {
           type = 'video';
           hasMedia = true;
-        } else {
+        } else if (apiTask.task_sub_category_name === 'Image') {
           type = 'medicine';
         }
-      } else {
-        type = 'medicine';
       }
     }
 
@@ -342,6 +207,19 @@ export default function PatientTasks() {
       }
     }
 
+    // Debug task details for image tasks
+    if (type === 'medicine' && apiTask.task_sub_category_name === 'Image') {
+      console.log('Image Task Mapped:', {
+        id: apiTask.id,
+        ref_file: apiTask.ref_file,
+        task_sub_category_name: apiTask.task_sub_category_name,
+        name: apiTask.name,
+        remarks: apiTask.remarks,
+        task_date: apiTask.task_date,
+        task_status: apiTask.task_status,
+      });
+    }
+
     return {
       id: apiTask.id,
       type,
@@ -352,8 +230,9 @@ export default function PatientTasks() {
       time: hasMedia ? undefined : time,
       completed: (apiTask.task_status || '').toLowerCase() === 'completed',
       dose,
+      task_sub_category_name: apiTask.task_sub_category_name,
       ...Object.keys(apiTask).reduce((acc, key) => {
-        if (!['id', 'task_type', 'name', 'remarks', 'ref_file', 'task_date', 'task_status'].includes(key)) {
+        if (!['id', 'task_type', 'name', 'remarks', 'ref_file', 'task_date', 'task_status', 'task_sub_category_name'].includes(key)) {
           acc[key] = apiTask[key];
         }
         return acc;
@@ -367,6 +246,7 @@ export default function PatientTasks() {
       const customerId = await AsyncStorage.getItem('Customer_id');
       if (!customerId) throw new Error('Customer ID not found');
       const res = await getusertasklistview('ALL', customerId);
+      console.log('Fetched Tasks:', res.data);
       const mappedTasks = (res.data || []).map(mapApiTaskToAppTask);
       setTasks(mappedTasks);
       return mappedTasks;
@@ -433,20 +313,14 @@ export default function PatientTasks() {
 
   const handleVideoPress = async (task) => {
     try {
-      // Check and pause audio if playing
+      console.log('[PatientTasks] Opening video:', { taskId: task.id, ref_file: task.ref_file });
       if (soundRef.current) {
-        console.log('Attempting to pause audio...');
         const status = await soundRef.current.getStatusAsync();
-        console.log('Audio status:', status);
         if (status.isLoaded && status.isPlaying) {
-          console.log('Pausing audio...');
           await soundRef.current.pauseAsync();
           setIsPlaying(false);
-          console.log('Audio paused successfully');
         }
-        // Fallback: Stop and unload if pause fails or state is uncertain
         if (status.isLoaded && status.isPlaying) {
-          console.log('Fallback: Stopping and unloading audio...');
           await soundRef.current.stopAsync();
           await soundRef.current.unloadAsync();
           soundRef.current = null;
@@ -455,25 +329,21 @@ export default function PatientTasks() {
           setIsPlaying(false);
           setPosition(0);
           setDuration(0);
-          console.log('Audio stopped and unloaded');
         }
-      } else {
-        console.log('No audio instance found');
       }
-      // Proceed to open video player
       setVideoTask(task);
       setVideoModalVisible(true);
-      console.log('Video modal opened for task:', task.id);
     } catch (error) {
-      console.error('Error in handleVideoPress:', error);
+      console.error('[PatientTasks] Video press error:', error);
       Alert.alert('Error', 'Failed to start video playback: ' + error.message);
     }
   };
 
-  const handleVideoClose = () => {
+  const handleVideoClose = useCallback(() => {
+    console.log('[PatientTasks] handleVideoClose called');
     setVideoTask(null);
     setVideoModalVisible(false);
-  };
+  }, []);
 
   const handlePlayPause = async () => {
     if (!soundRef.current) return;
@@ -504,33 +374,21 @@ export default function PatientTasks() {
     }
   };
 
-  const handleNext = () => {
-    if (!currentTrack) return;
-    const currentIndex = tasks.findIndex(t => t.id === currentTrack.id);
-    const nextIndex = (currentIndex + 1) % tasks.length;
-    const nextTask = tasks[nextIndex];
-    if (nextTask.type === 'audio') {
-      handlePlayPress(nextTask);
-    }
-  };
-
-  const handlePrevious = () => {
-    if (!currentTrack) return;
-    const currentIndex = tasks.findIndex(t => t.id === currentTrack.id);
-    const prevIndex = currentIndex === 0 ? tasks.length - 1 : currentIndex - 1;
-    const prevTask = tasks[prevIndex];
-    if (prevTask.type === 'audio') {
-      handlePlayPress(prevTask);
-    }
-  };
-
-  const handleCompletePress = async (taskId) => {
+  const handleCompletePress = async (task) => {
     try {
+      setIsUpdating(true);
       const customerId = await AsyncStorage.getItem('Customer_id');
-      await markTaskAsCompleted(taskId, customerId);
+      if (!customerId) throw new Error('Customer ID not found');
+      if (!task?.id) throw new Error('Missing task ID');
+
+      await markTaskAsCompleted(task, customerId);
       await fetchTasks();
+      console.log('Task completion processed for taskId:', task.id);
     } catch (error) {
-      Alert.alert('Error', 'Failed to mark task as completed. Please try again.');
+      console.error('Error in handleCompletePress:', error);
+      Alert.alert('Error', error.message || 'Failed to mark task as completed. Please try again.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -543,69 +401,72 @@ export default function PatientTasks() {
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
       <Header title="My Tasks" onBack={handleBack} />
 
-      <View style={styles.tabBar}>
-        {TAB_OPTIONS.map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tab, selectedTab === tab.key && styles.tabActive]}
-            onPress={() => setSelectedTab(tab.key)}
-            activeOpacity={0.8}
-          >
-            <Text
-              style={[styles.tabText, selectedTab === tab.key && styles.tabTextActive]}
+      <View style={styles.contentContainer}>
+        <View style={styles.tabBar}>
+          {TAB_OPTIONS.map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, selectedTab === tab.key && styles.tabActive]}
+              onPress={() => setSelectedTab(tab.key)}
+              activeOpacity={0.8}
             >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              <Text
+                style={[styles.tabText, selectedTab === tab.key && styles.tabTextActive]}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {error.visible && (
+          <Text style={styles.errorText}>{error.message}</Text>
+        )}
+
+        {loading ? (
+          <ActivityIndicator size="large" color="#2986cc" style={styles.loader} />
+        ) : filteredTasks.length === 0 ? (
+          <Text style={styles.noTaskText}>No tasks for this period.</Text>
+        ) : (
+          <FlatList
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.taskList}
+            data={filteredTasks}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <TaskCard
+                task={item}
+                onPlayPress={handlePlayPress}
+                onVideoPress={handleVideoPress}
+                onCompletePress={handleCompletePress}
+                isToday={selectedTab === 'today'}
+                isCurrentTrack={currentTrack?.id === item.id}
+                isPlaying={isPlaying && currentTrack?.id === item.id}
+                isLoading={loadingId === item.id}
+                isUpdating={isUpdating}
+              />
+            )}
+          />
+        )}
       </View>
 
-      {error.visible && (
-        <Text style={styles.errorText}>{error.message}</Text>
-      )}
-
-      {loading ? (
-        <ActivityIndicator size="large" color="#2986cc" style={styles.loader} />
-      ) : filteredTasks.length === 0 ? (
-        <Text style={styles.noTaskText}>No tasks for this period.</Text>
-      ) : (
-        <FlatList
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.taskList}
-          data={filteredTasks}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <TaskCard
-              task={item}
-              onPlayPress={handlePlayPress}
-              onVideoPress={handleVideoPress}
-              onCompletePress={handleCompletePress}
-              isToday={selectedTab === 'today'}
-              isCurrentTrack={currentTrack?.id === item.id}
-              isPlaying={isPlaying && currentTrack?.id === item.id}
-              isLoading={loadingId === item.id}
-            />
-          )}
-        />
-      )}
-
       {currentTrack && currentTrack.type === 'audio' && (
-        <MiniPlayer
-          sound={sound}
-          track={{
-            ...currentTrack,
-            title: currentTrack.name || 'Audio Task',
-            artist: `Therapy: ${currentTrack.therapyFor || 'N/A'}`,
-            artwork: require('../../assets/images/waveform.png'),
-          }}
-          isPlaying={isPlaying}
-          position={position}
-          duration={duration}
-          onSeek={handleSeek}
-          onPlayPause={handlePlayPause}
-          onNext={handleNext}
-          onPrevious={handlePrevious}
-        />
+        <View style={styles.miniPlayerContainer}>
+          <MiniPlayer
+            sound={sound}
+            track={{
+              ...currentTrack,
+              title: currentTrack.name || 'Audio Task',
+              artist: `Therapy: ${currentTrack.therapyFor || 'N/A'}`,
+              artwork: require('../../assets/images/waveform.png'),
+            }}
+            isPlaying={isPlaying}
+            position={position}
+            duration={duration}
+            onSeek={handleSeek}
+            onPlayPause={handlePlayPause}
+          />
+        </View>
       )}
 
       {videoTask && (
@@ -617,10 +478,18 @@ export default function PatientTasks() {
       )}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f7fafd', marginTop: 30 },
+  container: {
+    flex: 1,
+    backgroundColor: '#f7fafd',
+    marginTop: 30,
+  },
+  contentContainer: {
+    flex: 1,
+    paddingBottom: 80,
+  },
   tabBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -647,100 +516,7 @@ const styles = StyleSheet.create({
   },
   taskList: {
     padding: 20,
-    paddingBottom: 100,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    elevation: 3,
-    minHeight: 100,
-  },
-  audioCard: {
-    minHeight: 110,
-    paddingVertical: 10,
-  },
-  videoCard: {
-    minHeight: 110,
-    paddingVertical: 10,
-  },
-  cardIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e5f1fa',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  cardContent: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#2986cc',
-    marginBottom: 2,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
-  },
-  cardActions: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  mediaCardActions: {
-    justifyContent: 'space-between',
-    height: 'auto',
-  },
-  completeButton: {
-    backgroundColor: '#2a7fba',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-  },
-  mediaCompleteButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-  },
-  completeButtonDone: {
-    backgroundColor: '#28a745',
-  },
-  completeButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  viewButton: {
-    backgroundColor: '#6c757d',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    marginTop: 8,
-  },
-  viewButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  progressContainer: {
-    marginTop: 8,
-    width: '100%',
-  },
-  progressBar: {
-    width: '100%',
-    height: 16,
+    paddingBottom: 20,
   },
   noTaskText: {
     marginTop: 40,
@@ -757,33 +533,14 @@ const styles = StyleSheet.create({
   loader: {
     marginTop: 40,
   },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: '90%',
-    height: '70%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    overflow: 'hidden',
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fullImage: {
-    width: '100%',
-    height: '100%',
-  },
-  closeButton: {
+  miniPlayerContainer: {
     position: 'absolute',
-    top: 15,
-    right: 15,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 20,
-    padding: 5,
-    zIndex: 1,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e5e5',
+    zIndex: 10,
   },
 });
