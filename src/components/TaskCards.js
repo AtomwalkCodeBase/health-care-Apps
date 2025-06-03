@@ -90,7 +90,7 @@ const TaskCard = ({ task, onPlayPress, onVideoPress, onCompletePress, isToday, i
 
   const handleCompleteConfirm = () => {
     setCompleteConfirmVisible(true);
-    onComplete(task);
+    onCompletePress(task);
     setCompleteConfirmVisible(false);
   };
 

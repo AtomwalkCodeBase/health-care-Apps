@@ -56,32 +56,6 @@ export const getCustomerDetailListURL = async () => {
   return `${endpoint}/customer_detail_list/${db_name}/`;
 }
 
-export const getLeadListURL = `${endpoint}/lead_list/${db_name}/`;
-export const getLeadDataListURL = `${endpoint}/lead_data_list/${db_name}/`;
-export const addTaskURL = `${endpoint}/add_task/${db_name}/`;
-// export const profileInfoURL = `${endpoint}/profile_info/${db_name}/`;
-export const companyInfoURL = `${endpoint}/company_info/${db_name}/`;
-export const getTaskInterestListURL = `${endpoint}/task_interest_list/${db_name}/`;
-export const getProductCategoryListURL = `${endpoint}/product_category_list/${db_name}/`;
-export const getVariationNameListURL = `${endpoint}/variation_name_list/${db_name}/`;
-export const getLeadStatusListURL = `${endpoint}/lead_status_list/${db_name}/`;
-export const getTaskTypeListURL = `${endpoint}/task_type_list/${db_name}/`;
-export const updateTaskInterestURL = `${endpoint}/update_task_interest/${db_name}/`;
-export const getOrderListURL = `${endpoint}/order_list/${db_name}/`;
-export const updateLeadStatusURL = `${endpoint}/update_lead_status/${db_name}/`;
-export const getUserListURL = `${endpoint}/user_list/${db_name}/`;
-export const getEmpLeavedata = `${endpoint}/get_employee_leave/${db_name}/`;
-export const addEmpLeave = `${endpoint}/process_employee_leave/${db_name}/`;
-export const addClaim = `${endpoint}/add_claim/${db_name}/`;
-export const processClaim= `${endpoint}/process_claim/${db_name}/`;
-export const getEmpClaimdata = `${endpoint}/get_claim_list/${db_name}/`;
-export const getExpenseItemList = `${endpoint}/expense_item_list/${db_name}/`;
-export const getProjectList = `${endpoint}/project_list/${db_name}/`;
-export const getEmpAttendanceData = `${endpoint}/get_employee_attendance/${db_name}/`;
-export const getEmpHolidayData = `${endpoint}/get_holiday_data/${db_name}/`;
-export const empCheckData = `${endpoint}/process_employee_attendance/${db_name}/`;
-export const getClaimApproverList = `${endpoint}/get_claim_approve_list/${db_name}/`;
-// export const getemployeeList = `${endpoint}/get_employee_list/${db_name}/`;
 export const getemployeeList = async () => {
  const db_name = await getDbName();
   return `${endpoint}/get_employee_list/${db_name}/`;
@@ -139,6 +113,16 @@ export const setuserpin =  async () => {
 export const profileInfoURL = async () => {
   const db_name = await getDbName();
  return  `${endpoint}/profile_info/${db_name}/`;
+}
+
+export const doctypelistURL = async () => {
+  const db_name = await getDbName();
+ return  `${endpoint}/get_document_type_list/${db_name}/`;
+}
+
+export const customerdoclistURL = async () => {
+  const db_name = await getDbName();
+ return  `${endpoint}/get_customer_document_list/${db_name}/`;
 }
 
 export const getDbList = `${endpoint}/get_applicable_site/`;

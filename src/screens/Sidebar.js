@@ -43,12 +43,12 @@ const Sidebar = ({ profile, onNavigate, onLogout, onClose }) => {
           active={activeItem === "Homepage"}
           onPress={() => handleNavigation("/home", "Homepage")} 
         />
-        <SidebarItem 
+        {/* <SidebarItem 
           icon="bell-outline" 
           label="Notifications" 
           active={activeItem === "Notifications"}
           onPress={() => handleNavigation("/Notifications", "Notifications")} 
-        />
+        /> */}
         <SidebarItem 
           icon="file-document-outline" 
           label="My Reports" 
@@ -61,7 +61,7 @@ const Sidebar = ({ profile, onNavigate, onLogout, onClose }) => {
           active={activeItem === "My Tasks"}
           onPress={() => handleNavigation("/TaskCategory", "My Tasks")} 
         />
-        <SidebarItem 
+        {/* <SidebarItem 
           icon="stethoscope" 
           label="Medical Records" 
           active={activeItem === "Medical Records"}
@@ -78,12 +78,12 @@ const Sidebar = ({ profile, onNavigate, onLogout, onClose }) => {
           label="Feedback/Query" 
           active={activeItem === "Feedback/Query"}
           onPress={() => handleNavigation("Feedback", "Feedback/Query")}
-        />
+        /> */}
       </View>
 
       {/* Other Section */}
-      <Text style={styles.otherLabel}>OTHER</Text>
-      <View style={styles.menuSection}>
+      {/* <Text style={styles.otherLabel}>OTHER</Text> */}
+      {/* <View style={styles.menuSection}>
         <SidebarItem 
           icon="cog-outline" 
           label="Setting" 
@@ -114,16 +114,16 @@ const Sidebar = ({ profile, onNavigate, onLogout, onClose }) => {
             onNavigate("AboutUs");
           }} 
         />
-      </View>
+      </View> */}
 
       {/* Logout */}
-      <TouchableOpacity style={styles.logoutButton} onPress={() => {
+      {/* <TouchableOpacity style={styles.logoutButton} onPress={() => {
         onClose?.();
         onLogout();
       }}>
         <MaterialCommunityIcons name="logout" size={22} color="#EF4444" />
         <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
     </View>
   );
 };

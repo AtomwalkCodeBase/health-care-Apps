@@ -83,39 +83,6 @@ const AppProvider = ({ children }) => {
         } catch (err) {
             console.log('Login error:', err);
           }
-          
-        // try {
-        //     if (!username.includes("@")) {
-        //         const userDetailResponse = await axios.get(`https://www.atomwalk.com/api/get_user_detail/?user_id=${username}`);
-        //         username = userDetailResponse.data.username;
-        //     }
-        //     const res = await publicAxiosRequest.post(loginURL, { username, password });
-        //     const userToken = res.data['key'];
-        //     await AsyncStorage.multiSet([
-        //         ['userToken', userToken],
-        //         ['Password', password],
-        //         ['username', username],
-        //     ]);
-        //     setUserToken(userToken);
-        //     router.replace({ pathname: 'home' });
-        // } catch (err) {
-        //     console.log('Login error:', err);
-        // }
-
-        // try {
-        //     const res = await getCompanyInfo();
-        //     const companyInfo = res.data;
-        //     const db_name = companyInfo.db_name.substr(3);
-        //     await AsyncStorage.multiSet([
-        //         ['companyInfo', JSON.stringify(companyInfo)],
-        //         ['dbName', db_name],
-        //     ]);
-        //     setCompanyInfo(companyInfo);
-        //     setDbName(db_name);
-        // } catch (error) {
-        //     console.log('Company Info Fetch Error:', error);
-        // }
-
         setIsLoading(false);
     };
 

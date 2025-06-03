@@ -261,7 +261,7 @@ const handleBiometricToggle = (value) => {
 
                         <View style={styles.divider} />
 
-                        <TouchableOpacity
+                        {/* <TouchableOpacity
                             style={styles.actionItem}
                             onPress={() => router.push('/MyAccount')}
                         >
@@ -270,9 +270,9 @@ const handleBiometricToggle = (value) => {
                             </View>
                             <Text style={styles.actionText}>My Account</Text>
                             <MaterialCommunityIcons name="chevron-right" size={20} color="#999" />
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
 
-                        <View style={styles.divider} />
+                        {/* <View style={styles.divider} /> */}
 
                         <TouchableOpacity
                             style={styles.actionItem}

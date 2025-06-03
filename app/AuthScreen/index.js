@@ -20,10 +20,6 @@ import Logos from "../../assets/images/Atom_walk_logo.jpg";
 import { useRouter } from "expo-router";
 import axios from "axios"; // If you prefer axios for API calls
 import AsyncStorage from "@react-native-async-storage/async-storage";
-// import {
-//   authAxiosPost,
-//   publicAxiosRequest,
-// } from "../../src/services/HttpMethod";
 import CompanyDropdown from "../../src/components/CompanyDropdown";
 import { colors } from "../../src/Styles/appStyle";
 import { LinearGradient } from "expo-linear-gradient";
@@ -158,14 +154,6 @@ useEffect(() => {
   setCompanyError('');
   };
 
-  // const getDropdownValue = () => {
-  // if (!selectedCompany) return null;
-  // return {
-  //   label: selectedCompany.ref_cust_name,
-  //   value: selectedCompany.ref_cust_name
-  // };
-  // };
-
   const validateInput = () => {
     if (!selectedCompany) {
       setCompanyError("Please select your company");
@@ -279,12 +267,6 @@ useEffect(() => {
                   </View>
                 )}
               </View>
-              {/* {profileName && (
-                <WelcomeContainer>
-                  <GreetingText>Welcome back,</GreetingText>
-                  <UserNameText>{profileName}</UserNameText>
-                </WelcomeContainer>
-              )} */}
             </View>
           </LinearGradient>
         </Header>
@@ -321,7 +303,7 @@ useEffect(() => {
                       onChangeText={setMobileNumber}
                       keyboardType="numeric" // Changed to default to allow both numbers and text
                       placeholderTextColor="#6c757d"
-                      maxLength={10} // Increased max length for employee IDs
+                      maxLength={10} 
                     />
                   </InputWrapper>
 
@@ -456,7 +438,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: scaleHeight(80), // Add padding to prevent content from being hidden behind footer
+    paddingBottom: scaleHeight(80), 
   },
   hiddenFooter: {
     display: "none",

@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList, getemployeeList, getequipmentList, userLoginURL, getbookedList, doctorbooking, setuserpin, userTaskList, getTaskCategoryURL, updateTaskURL } from "../services/ConstantServies";
+import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList, getemployeeList, getequipmentList, userLoginURL, getbookedList, doctorbooking, setuserpin, userTaskList, getTaskCategoryURL, updateTaskURL, doctypelistURL, customerdoclistURL } from "../services/ConstantServies";
 import { authAxios, authAxiosFilePost, authAxiosPost, authAxiosPosts } from "./HttpMethod";
 
 export function getEmpLeave(leave_type, emp_id, year) {
@@ -259,45 +259,6 @@ export async function getTaskCategory(payload) {
   return authAxios(url, data);
 }
 
-// export function customerLogin(username, password) {
-//   let data = {
-//     'mobile_number': username,
-//     'pin': password
-//   };
-//   return authAxiosPost(userLoginURL, data)
-// }
-
-// export async function setuserpinview(o_pin, n_pin) {
-//   try {
-//     const customerId = await AsyncStorage.getItem("Customer_id");
-//     let customerIdNumber = parseInt(customerId, 10);
-
-//     if (isNaN(customerIdNumber)) {
-//       throw new Error("Invalid Customer ID: " + customerId);
-//     }
-
-//     const effectiveCustomerId = customerIdNumber;
-
-//     let data = {
-//       u_id: effectiveCustomerId,
-//       o_pin: o_pin,
-//       n_pin: n_pin,
-//       user_type: "CUSTOMER",
-//     };
-//     // console.log("Sending request to API with data:", data);
-//     if (response) {  // You might want to check response.status === 200 or similar depending on your API
-//       await AsyncStorage.setItem("Password", n_pin);
-//       await AsyncStorage.setItem("userPin", n_pin);
-//     }
-//     const response = await authAxiosPost(setuserpin, data);
-//     // console.log("API Response:", response);
-//     return response;
-//   } catch (error) {
-//     console.error("Error in setuserpinView:", error.response ? error.response.data : error.message);
-//     throw error;
-//   }
-// }
-
 export async function getusertasklistview(task_type, customer_id) {
   try {
     let data = {};
@@ -361,3 +322,15 @@ export async function setUserPinView(o_pin, n_pin) {
     throw error;
   }
 } 
+
+export async function getDocTypeListView(payload) {
+  const url = await doctypelistURL(); 
+  let data = payload;
+  return authAxios(url, data);
+}
+
+export async function getCustomerDocListView(payload) {
+  const url = await customerdoclistURL(); 
+  let data = payload;
+  return authAxios(url, data);
+}

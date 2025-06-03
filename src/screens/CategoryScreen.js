@@ -57,11 +57,11 @@ const markTaskAsCompleted = async (task, customerId) => {
       task_type: task.type ? task.type.toUpperCase() : 'GENERAL',
     };
 
-    console.log('Marking task as completed:', { task_data, is_completed: 'Y' });
+    // console.log('Marking task as completed:', { task_data, is_completed: 'Y' });
 
     const response = await updateTask(task_data, 'Y');
     await new Promise((resolve) => setTimeout(resolve, 500));
-    console.log('Task marked as completed successfully:', { taskId: task.id, response });
+    // console.log('Task marked as completed successfully:', { taskId: task.id, response });
     return { success: true };
   } catch (error) {
     console.error('Failed to mark task as completed:', error);
@@ -90,7 +90,7 @@ export default function PatientTasks() {
 
   // Debug videoModalVisible changes
   useEffect(() => {
-    console.log('[PatientTasks] videoModalVisible changed:', videoModalVisible);
+    // console.log('[PatientTasks] videoModalVisible changed:', videoModalVisible);
   }, [videoModalVisible]);
 
   // Initialize audio session
@@ -203,21 +203,21 @@ export default function PatientTasks() {
         dose = remarksParts[0];
         time = remarksParts[1];
       } else {
-        dose = apiTask.remarks || 'N/A';
+        dose = apiTask.dose || 'N/A';
       }
     }
 
     // Debug task details for image tasks
     if (type === 'medicine' && apiTask.task_sub_category_name === 'Image') {
-      console.log('Image Task Mapped:', {
-        id: apiTask.id,
-        ref_file: apiTask.ref_file,
-        task_sub_category_name: apiTask.task_sub_category_name,
-        name: apiTask.name,
-        remarks: apiTask.remarks,
-        task_date: apiTask.task_date,
-        task_status: apiTask.task_status,
-      });
+      // console.log('Image Task Mapped:', {
+      //   id: apiTask.id,
+      //   ref_file: apiTask.ref_file,
+      //   task_sub_category_name: apiTask.task_sub_category_name,
+      //   name: apiTask.name,
+      //   remarks: apiTask.remarks,
+      //   task_date: apiTask.task_date,
+      //   task_status: apiTask.task_status,
+      // });
     }
 
     return {
@@ -246,7 +246,7 @@ export default function PatientTasks() {
       const customerId = await AsyncStorage.getItem('Customer_id');
       if (!customerId) throw new Error('Customer ID not found');
       const res = await getusertasklistview('ALL', customerId);
-      console.log('Fetched Tasks:', res.data);
+      // console.log('Fetched Tasks:', res.data);
       const mappedTasks = (res.data || []).map(mapApiTaskToAppTask);
       setTasks(mappedTasks);
       return mappedTasks;
@@ -313,7 +313,7 @@ export default function PatientTasks() {
 
   const handleVideoPress = async (task) => {
     try {
-      console.log('[PatientTasks] Opening video:', { taskId: task.id, ref_file: task.ref_file });
+      // console.log('[PatientTasks] Opening video:', { taskId: task.id, ref_file: task.ref_file });
       if (soundRef.current) {
         const status = await soundRef.current.getStatusAsync();
         if (status.isLoaded && status.isPlaying) {
@@ -340,7 +340,7 @@ export default function PatientTasks() {
   };
 
   const handleVideoClose = useCallback(() => {
-    console.log('[PatientTasks] handleVideoClose called');
+    // console.log('[PatientTasks] handleVideoClose called');
     setVideoTask(null);
     setVideoModalVisible(false);
   }, []);
@@ -383,7 +383,7 @@ export default function PatientTasks() {
 
       await markTaskAsCompleted(task, customerId);
       await fetchTasks();
-      console.log('Task completion processed for taskId:', task.id);
+      // console.log('Task completion processed for taskId:', task.id);
     } catch (error) {
       console.error('Error in handleCompletePress:', error);
       Alert.alert('Error', error.message || 'Failed to mark task as completed. Please try again.');

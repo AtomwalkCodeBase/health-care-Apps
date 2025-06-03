@@ -122,7 +122,7 @@ export default function VideoPlayer({ task, visible, onClose }) {
             cleanupVideo();
             onClose();
           }}>
-            <Ionicons name="close-circle" size={35} color="#ff4d4d" />
+            <Ionicons name="close-circle" size={25} color="#ff4d4d" />
           </TouchableOpacity>
 
           {visible && task?.ref_file && (
