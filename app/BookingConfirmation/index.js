@@ -27,18 +27,18 @@ const BookingConfirmation = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isReschedule = params.isReschedule === 'true';
 
-  // Debug: Log received params
-  useEffect(() => {
-    console.log("Received params:", params);
-  }, []);
-
   const formatDateForAPI = (dateString) => {
-    if (!dateString) return "";
+    if (!dateString) {
+      console.warn("formatDateForAPI: No date string provided, using default");
+      return "01-01-1970";
+    }
     try {
       const [dayAbbr, dayNum, monthAbbr] = dateString.split(" ");
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const monthIndex = months.indexOf(monthAbbr);
       
+      if (monthIndex === -1) throw new Error("Invalid month abbreviation");
+
       const today = new Date();
       const year = today.getFullYear();
       const selectedDate = new Date(year, monthIndex, parseInt(dayNum));
@@ -53,29 +53,38 @@ const BookingConfirmation = () => {
       return `${formattedDay}-${formattedMonth}-${selectedDate.getFullYear()}`;
     } catch (error) {
       console.error("Error formatting date:", error);
-      return "";
+      return "01-01-1970";
     }
   };
 
   const formatTimeForAPI = (timeStr) => {
-    if (!timeStr) return "";
+    if (!timeStr) {
+      console.warn("formatTimeForAPI: No time string provided, using default");
+      return "12:00 am";
+    }
     try {
       // Handle both "9:00AM" and "09:00" formats
       if (timeStr.includes('AM') || timeStr.includes('PM')) {
         const [time, period] = timeStr.match(/(\d+:\d+)([AP]M)/i)?.slice(1) || [];
         return time ? `${time} ${period.toLowerCase()}` : timeStr;
       }
-      return timeStr; // Assume it's already in correct format
+      // Convert 24-hour format to 12-hour with AM/PM
+      const [hoursStr, minutes] = timeStr.split(':').map(part => part.trim());
+      let hours = parseInt(hoursStr, 10);
+      const period = hours >= 12 ? 'pm' : 'am';
+      if (hours > 12) hours -= 12;
+      if (hours === 0) hours = 12;
+      return `${hours}:${minutes} ${period}`;
     } catch (error) {
       console.error("Error formatting time:", error);
-      return timeStr;
+      return "12:00 am";
     }
   };
 
   const calculateDuration = (startTime, endTime) => {
     try {
       const parseTime = (timeStr) => {
-        const cleanTime = timeStr.trim();
+        const cleanTime = timeStr?.trim() || "12:00 am";
         if (cleanTime.includes('AM') || cleanTime.includes('PM')) {
           const [time, period] = cleanTime.match(/(\d+:\d+)([AP]M)/i)?.slice(1) || [];
           if (!time || !period) return null;
@@ -92,7 +101,10 @@ const BookingConfirmation = () => {
 
       const start = parseTime(startTime);
       const end = parseTime(endTime);
-      if (!start || !end) return parseFloat(params.duration) || 1.0;
+      if (!start || !end) {
+        console.warn("calculateDuration: Invalid time format, using default duration");
+        return parseFloat(params.duration) || 1.0;
+      }
 
       const startTotalMinutes = start.hours * 60 + start.minutes;
       let endTotalMinutes = end.hours * 60 + end.minutes;
@@ -105,7 +117,10 @@ const BookingConfirmation = () => {
   };
 
   const formatDisplayDate = (dateString) => {
-    if (!dateString) return "";
+    if (!dateString) {
+      console.warn("formatDisplayDate: No date string provided, using default");
+      return "Invalid date";
+    }
     try {
       const [dayAbbr, dayNum, monthAbbr] = dateString.split(" ");
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -114,6 +129,8 @@ const BookingConfirmation = () => {
       const dayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(dayAbbr);
       const monthIndex = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(monthAbbr);
       
+      if (dayIndex === -1 || monthIndex === -1) throw new Error("Invalid date format");
+
       const today = new Date();
       const year = today.getFullYear();
       const date = new Date(year, monthIndex, parseInt(dayNum));
@@ -146,14 +163,9 @@ const BookingConfirmation = () => {
         return;
       }
       
-      const startDate = new Date(params.fullDate);
-      const [startTime] = params.time.split(" - ");
-      const [time, period] = startTime.match(/(\d+:\d+)([AP]M)/i)?.slice(1) || [];
-      
-      if (!time || !period) {
-        Alert.alert('Error', 'Invalid time format');
-        return;
-      }
+      const startDate = new Date(params.fullDate || new Date());
+      const [startTime] = params.time ? params.time.split(" - ") : ["12:00 am"];
+      const [time, period] = startTime.match(/(\d+:\d+)([AP]M)/i)?.slice(1) || ["12:00", "AM"];
       
       let [hours, minutes] = time.split(':').map(Number);
       if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
@@ -163,11 +175,11 @@ const BookingConfirmation = () => {
       const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
       
       await Calendar.createEventAsync(writableCalendar.id, {
-        title: `Appointment with ${params.doctorName}`,
+        title: `Appointment with ${params.doctorName || "Doctor"}`,
         startDate,
         endDate,
         location: params.location || 'Clinic',
-        notes: `Specialty: ${params.specialty}`,
+        notes: `Specialty: ${params.specialty || "N/A"}`,
       });
       
       Alert.alert('Success', 'Event added to calendar!');
@@ -196,11 +208,12 @@ const BookingConfirmation = () => {
     setShowConfirmModal(false);
 
     try {
-      const [startTime, endTime] = params.time.split(" - ");
-      const bookingDate = formatDateForAPI(params.date);
-      const formattedStartTime = params.startTime || formatTimeForAPI(startTime);
-      const formattedEndTime = params.endTime || formatTimeForAPI(endTime);
-      const duration = calculateDuration(startTime, endTime);
+      // Validate and prepare parameters
+      const [startTime, endTime] = params.time ? params.time.split(" - ") : ["12:00 am", "13:00 pm"];
+      const bookingDate = formatDateForAPI(params.date) || "01-01-1970";
+      const formattedStartTime = formatTimeForAPI(startTime) || "12:00 am";
+      const formattedEndTime = formatTimeForAPI(endTime) || "13:00 pm";
+      const duration = calculateDuration(startTime, endTime) || 1.0;
 
       console.log("Booking details:", {
         doctorId: params.doctorId,
@@ -217,29 +230,38 @@ const BookingConfirmation = () => {
       const customerId = await AsyncStorage.getItem("Customer_id");
       if (!customerId) throw new Error("Customer ID not found");
 
+      // Call doctorBookingView with individual parameters
       const response = await doctorBookingView(
         parseInt(customerId),
-        parseInt(params.doctorId),
+        parseInt(params.doctorId), // Map doctorId to equipment_id
         bookingDate,
         formattedStartTime,
         formattedEndTime,
-        duration,
+        duration.toString(),
         isReschedule ? "UPDATE" : "ADD_BOOKING",
-        isReschedule ? params.booking_id : null
+        isReschedule ? params.booking_id?.toString() : null
       );
 
-      console.log("API response:", response);
+      // console.log("API response:", response);
 
-      if (response?.status === 200 || response?.data?.success) {
+      // Validate response
+      if (!response) throw new Error("No response received from API");
+      
+      // Handle non-JSON responses
+      if (typeof response === 'string' && response.startsWith('<')) {
+        throw new Error("Invalid response format: Server returned HTML instead of JSON");
+      }
+
+      if (response.status === 200 || response.data?.success) {
         setShowSuccessModal(true);
       } else {
-        throw new Error(response?.data?.message || "Booking failed");
+        throw new Error(response.data?.message || "Booking failed");
       }
     } catch (error) {
       console.error("Booking error:", error);
       Alert.alert(
         "Error",
-        error.response?.data?.message || error.message || "Booking failed"
+        error.message || "Booking failed. Please check your connection and try again."
       );
     } finally {
       setIsSubmitting(false);
@@ -315,7 +337,7 @@ const BookingConfirmation = () => {
             </View>
             <View>
               <Text style={styles.detailLabel}>Time</Text>
-              <Text style={styles.detailText}>{params.time || `${params.startTime} - ${params.endTime}`}</Text>
+              <Text style={styles.detailText}>{params.time || `${params.startTime || "12:00 am"} - ${params.endTime || "13:00 pm"}`}</Text>
             </View>
           </View>
         </View>
@@ -414,10 +436,10 @@ const BookingConfirmation = () => {
               {isReschedule ? "Appointment Rescheduled" : "Appointment Booked"}
             </Text>
             <View style={styles.modalTxt}>
-              <Text style={styles.detailText}>Doctor: {params.doctorName}</Text>
-              <Text style={styles.detailText}>Specialty: {params.specialty}</Text>
+              <Text style={styles.detailText}>Doctor: {params.doctorName || "Doctor Name"}</Text>
+              <Text style={styles.detailText}>Specialty: {params.specialty || "Specialty"}</Text>
               <Text style={styles.detailText}>Date: {formatDisplayDate(params.date)}</Text>
-              <Text style={styles.detailText}>Time: {params.time}</Text>
+              <Text style={styles.detailText}>Time: {params.time || "N/A"}</Text>
             </View>
             <View style={styles.modalButtonContainer}>
               <TouchableOpacity
