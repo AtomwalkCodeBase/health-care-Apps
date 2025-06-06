@@ -13,13 +13,23 @@ import {
   Animated
 } from "react-native";
 import { router } from "expo-router";
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { getProfileInfo } from "../services/authServices";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
-import { getemployelistview } from "../services/productServices";
 import { getAppointments, subscribeToAppointments, fetchBookedAppointments } from "./MyAppointments";
 import { StatusBar } from "expo-status-bar";
 import Sidebar from "./Sidebar";
+import img1 from "../../assets/images/home01.jpg";
+import img2 from "../../assets/images/home02.jpg";
+import img3 from "../../assets/images/home03.jpg";
+import Cimg1 from "../../assets/images/Home_04.jpg";
+import Cimg2 from "../../assets/images/Home_05.jpg";
+import Cimg3 from "../../assets/images/Home_06.jpg";
+import Cimg4 from "../../assets/images/Home_07.jpg";
+
+// ---- CARD GRID CONSTANTS ----
+const CARD_MARGIN = 12;
+const NUM_COLUMNS = 2;
+const CARD_WIDTH = (Dimensions.get('window').width - (CARD_MARGIN * (NUM_COLUMNS + 1))) / NUM_COLUMNS;
 
 const COLORS = {
   primary: "#2a7fba",
@@ -29,106 +39,52 @@ const COLORS = {
   rating: "#FFD700",
   danger: "#EF4444",
   searchBackground: "#f5f5f5",
+  cardGradientStart: "#ffffff",
+  cardGradientEnd: "#e6f0fa",
 };
 
 const STRINGS = {
   greeting: (name) =>
     name ? (name.length > 20 ? `${name.slice(0, 17)}...` : name) : "User",
   searchBase: "Search",
-  searchPhrase: "doctors or services",
-  servicesTitle: "Services",
-  doctorsTitle: "Top Rated Doctors",
-  noServices: "No services found!",
-  noDoctors: "No doctors found!",
+  searchPhrase: "appointments or profiles",
   bookNow: "Book Now",
   loading: "Loading data...",
   error: "Failed to load data. Please try again.",
   appointmentLoading: "Loading appointments...",
+  quickMenu: "Quick Menu",
 };
 
-const serviceList = [
-  { name: "Cardiology", icon: "heart-pulse" },
-  { name: "Dentistry", icon: "tooth-outline" },
-  { name: "ENT (Otolaryngology)", icon: "ear-hearing" },
-  { name: "Gastroenterology", icon: "stomach" },
-  { name: "Gynecology", icon: "gender-female" },
-  { name: "Neurology", icon: "brain" },
-  { name: "Oncology", icon: "ribbon" },
-  { name: "Ophthalmology", icon: "eye-outline" },
-  { name: "Orthopedics", icon: "walk" },
-  { name: "Pediatrics", icon: "baby-face-outline" },
-  { name: "Psychiatry", icon: "emoticon-outline" },
-  { name: "Pulmonology", icon: "lungs" },
-  { name: "Radiology", icon: "radiology-box" },
-  { name: "Urology", icon: "water" },
-].sort((a, b) => a.name.localeCompare(b.name));
+const AD_IMAGES = [
+  { id: "1", image: img1, title: "Appointments", screen: "/book" },
+  { id: "2", image: img2, title: "Your Tasks", screen: "/TaskCategory" },
+  { id: "3", image: img3, title: "Lab Reports", screen: "/Reports" },
+];
 
-const ServiceCard = React.memo(({ item, isSelected, onPress }) => (
-  <TouchableOpacity
-    style={[
-      styles.serviceCard,
-      isSelected && styles.selectedServiceCard,
-    ]}
-    onPress={onPress}
-    activeOpacity={0.7}
-  >
-    <MaterialCommunityIcons
-      name={item.icon}
-      size={30}
-      color="#fff"
-      style={styles.serviceIcon}
-    />
-    <Text style={styles.serviceText}>{item.name}</Text>
-  </TouchableOpacity>
-));
-
-const DoctorCard = React.memo(({ item, onPress }) => (
-  <TouchableOpacity
-    style={styles.doctorCard}
-    onPress={onPress}
-    activeOpacity={0.7}
-  >
-    {item.image ? (
-      <Image 
-        source={{ uri: item.image }} 
-        style={styles.doctorImage}
-      />
-    ) : (
-      <View style={[styles.doctorImage, styles.placeholderImage]}>
-        <MaterialCommunityIcons name="account" size={30} color="#ccc" />
-      </View>
-    )}
-    <View style={styles.doctorInfo}>
-      <Text style={styles.doctorName}>{item.name}</Text>
-      <Text style={styles.doctorSpecialty}>
-        {item.department_name} - {item.grade_name}
-      </Text>
-      <Text style={styles.doctorDetails}>
-        ⏰ 10:30 AM - 3:30 PM | Fee: 400
-      </Text>
-    </View>
-    <Text style={styles.rating}>⭐ 4.5</Text>
-  </TouchableOpacity>
-));
+const QUICK_MENU_CARDS = [
+  { id: "1", title: "Appointments", image: Cimg1, screen: "Appointments"},
+  { id: "4", title: "Tasks", image: Cimg4, screen: "Tasks" },
+  { id: "3", title: "Reports", image: Cimg3, screen: "Reports" },
+  { id: "2", title: "Profile", image: Cimg2, screen: "Profile" },
+];
 
 const HomeScreen = () => {
   const [profile, setProfile] = useState({});
   const [searchText, setSearchText] = useState("");
-  const [isAscending, setIsAscending] = useState(true);
-  const [doctorList, setDoctorList] = useState([]);
   const [appointments, setAppointments] = useState({ upcoming: [] });
-  const [selectedService, setSelectedService] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [appointmentLoading, setAppointmentLoading] = useState(false);
   const [animatedPlaceholder, setAnimatedPlaceholder] = useState(STRINGS.searchBase);
   const [sidebarVisible, setSidebarVisible] = useState(false);
-  
+  const [currentAdIndex, setCurrentAdIndex] = useState(0);
+
   const animationRef = useRef(null);
   const isTypingRef = useRef(true);
   const currentIndexRef = useRef(0);
   const sidebarAnim = useRef(new Animated.Value(-300)).current;
+  const flatListRef = useRef(null);
 
   const loadAppointmentsData = useCallback(async () => {
     try {
@@ -147,12 +103,6 @@ const HomeScreen = () => {
     try {
       setLoading(true);
       setError(null);
-      const [employeeRes, profileRes] = await Promise.all([
-        getemployelistview(),
-        getProfileInfo()
-      ]);
-      setDoctorList(employeeRes?.data || []);
-      setProfile(profileRes?.data || {});
       await loadAppointmentsData();
     } catch (error) {
       console.error("Data loading error:", error);
@@ -198,7 +148,6 @@ const HomeScreen = () => {
         }
       }
     };
-
     animationRef.current = setTimeout(typeText, 1000);
     return () => {
       if (animationRef.current) clearTimeout(animationRef.current);
@@ -222,48 +171,46 @@ const HomeScreen = () => {
     }
   };
 
-  const { filteredServices, filteredDoctors } = useMemo(() => {
-    const lowerText = searchText.toLowerCase();
-    const matchedServices = serviceList.filter(service =>
-      service.name.toLowerCase().includes(lowerText)
-    );
-
-    let matchedDoctors = doctorList.filter(doc =>
-      (doc.name?.toLowerCase()?.includes(lowerText) ||
-      doc.department_name?.toLowerCase()?.includes(lowerText)) &&
-      (!selectedService || doc.department_name === selectedService)
-    );
-
-    matchedDoctors = matchedDoctors.sort((a, b) =>
-      isAscending
-        ? (a.name || "").localeCompare(b.name || "")
-        : (b.name || "").localeCompare(a.name || "")
-    );
-
-    return { filteredServices: matchedServices, filteredDoctors: matchedDoctors };
-  }, [searchText, isAscending, doctorList, selectedService]);
-
-  const handleServicePress = useCallback((serviceName) => {
-    setSelectedService(selectedService === serviceName ? null : serviceName);
-  }, [selectedService]);
-
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadData();
   }, [loadData]);
 
-  const handleDoctorPress = useCallback((item) => {
-    router.push({
-      pathname: "/DoctorDetails",
-      params: { 
-        id: item.id.toString(),
-        name: item.name,
-        image: item.image, 
-        specialty: item.department_name,
-        grade: item.grade_name
-      },
-    });
+  const handleCardPress = (screen) => {
+    if (screen === "Appointments") {
+      router.push("/book");
+    } else if (screen === "Profile") {
+      router.push("/profile");
+    } else if (screen === "Reports") {
+      router.push("/Reports");
+    } else if (screen === "Tasks") {
+      router.push("/TaskCategory");
+    }
+  };
+
+  const handleAdPress = (screen) => {
+    router.push(screen);
+  };
+
+  const handleAdScroll = useCallback((event) => {
+    const contentOffsetX = event.nativeEvent.contentOffset.x;
+    const index = Math.round(contentOffsetX / (Dimensions.get("window").width - 40));
+    setCurrentAdIndex(index);
   }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (flatListRef.current) {
+        const nextIndex = (currentAdIndex + 1) % AD_IMAGES.length;
+        flatListRef.current.scrollToIndex({
+          index: nextIndex,
+          animated: true,
+        });
+        setCurrentAdIndex(nextIndex);
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [currentAdIndex]);
 
   if (loading && !refreshing) {
     return (
@@ -293,8 +240,6 @@ const HomeScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
-      
-      {/* Sidebar Animation */}
       {sidebarVisible && (
         <Animated.View 
           style={[
@@ -310,8 +255,6 @@ const HomeScreen = () => {
           />
         </Animated.View>
       )}
-      
-      {/* Overlay when sidebar is open */}
       {sidebarVisible && (
         <TouchableOpacity
           style={styles.overlay}
@@ -319,10 +262,7 @@ const HomeScreen = () => {
           onPress={toggleSidebar}
         />
       )}
-
-      {/* Main Content */}
       <View style={styles.contentContainer}>
-        {/* Header */}
         <View style={styles.headerContainer}>
           <View style={styles.topRow}>
             <TouchableOpacity
@@ -332,7 +272,6 @@ const HomeScreen = () => {
             >
               <MaterialCommunityIcons name="menu" size={32} color="#fff" />
             </TouchableOpacity>
-            
             <TouchableOpacity 
               style={styles.bookNowButton}
               onPress={() => router.push("/BookingAppointment")}
@@ -344,7 +283,6 @@ const HomeScreen = () => {
               <Text style={styles.bookNowText}>{STRINGS.bookNow}</Text>
             </TouchableOpacity>
           </View>
-          {/* Search Bar */}
           <View style={styles.searchContainer}>
             <MaterialCommunityIcons name="magnify" size={20} color="#777" />
             <TextInput
@@ -354,21 +292,8 @@ const HomeScreen = () => {
               value={searchText}
               onChangeText={setSearchText}
             />
-            <TouchableOpacity 
-              onPress={() => setIsAscending(!isAscending)}
-              style={styles.filterButton}
-              activeOpacity={0.7}
-            >
-              <MaterialCommunityIcons
-                name={isAscending ? "sort-alphabetical-ascending" : "sort-alphabetical-descending"}
-                size={20}
-                color="#777"
-              />
-            </TouchableOpacity>
           </View>
         </View>
-        
-        {/* Scrollable Content */}
         <ScrollView 
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -379,7 +304,6 @@ const HomeScreen = () => {
             />
           }
         >
-          {/* Appointments */}
           {appointmentLoading ? (
             <View style={styles.sectionLoading}>
               <ActivityIndicator size="small" color={COLORS.primary} />
@@ -423,39 +347,64 @@ const HomeScreen = () => {
               </View>
             )
           )}
-          
-          {/* Services */}
-          <Text style={styles.sectionTitle}>{STRINGS.servicesTitle}</Text>
-          <FlatList
-            horizontal
-            data={filteredServices}
-            renderItem={({ item }) => (
-              <ServiceCard 
-                item={item}
-                isSelected={selectedService === item.name}
-                onPress={() => handleServicePress(item.name)}
-              />
-            )}
-            keyExtractor={(item) => item.name}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.servicesContainer}
-          />
-          
-          {/* Doctors */}
-          <Text style={styles.sectionTitle}>{STRINGS.doctorsTitle}</Text>
-          {filteredDoctors.length === 0 ? (
-            <Text style={styles.noResultsText}>{STRINGS.noDoctors}</Text>
-          ) : (
+          <View style={styles.adCarouselContainer}>
             <FlatList
-              data={filteredDoctors}
+              ref={flatListRef}
+              horizontal
+              data={AD_IMAGES}
               renderItem={({ item }) => (
-                <DoctorCard item={item} onPress={() => handleDoctorPress(item)} />
+                <TouchableOpacity 
+                  style={styles.adCard}
+                  activeOpacity={0.7}
+                  onPress={() => handleAdPress(item.screen)}
+                >
+                  <Image
+                    source={item.image}
+                    style={styles.adImage}
+                    resizeMode="cover"
+                  />
+                  <Text style={styles.adText}>{item.title}</Text>
+                </TouchableOpacity>
               )}
-              keyExtractor={(item) => item.id.toString()}
-              scrollEnabled={false}
-              contentContainerStyle={styles.verticalList}
+              keyExtractor={(item) => item.id}
+              showsHorizontalScrollIndicator={false}
+              pagingEnabled
+              onScroll={handleAdScroll}
+              scrollEventThrottle={16}
+              contentContainerStyle={styles.adCarouselContent}
             />
-          )}
+            <View style={styles.dotContainer}>
+              {AD_IMAGES.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.dot,
+                    currentAdIndex === index ? styles.activeDot : styles.inactiveDot,
+                  ]}
+                />
+              ))}
+            </View>
+          </View>
+          <View style={styles.quickMenuContainer}>
+            <Text style={styles.sectionTitle}>{STRINGS.quickMenu}</Text>
+          </View>
+          <View style={styles.cardGrid}>
+            {QUICK_MENU_CARDS.map((card) => (
+              <TouchableOpacity 
+                key={card.id}
+                style={styles.dashboardCard}
+                onPress={() => handleCardPress(card.screen)}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={card.image}
+                  style={styles.cardImage}
+                  resizeMode="cover"
+                />
+                <Text style={styles.cardTitle}>{card.title}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </ScrollView>
       </View>
     </View>
@@ -553,89 +502,12 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     paddingVertical: 0,
   },
-  filterButton: {
-    marginLeft: 5,
-    padding: 5,
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     marginVertical: 10,
     marginHorizontal: 20,
     color: COLORS.text,
-  },
-  servicesContainer: {
-    paddingLeft: 20,
-    paddingBottom: 10,
-  },
-  serviceCard: {
-    width: Dimensions.get("window").width * 0.4,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    padding: 12,
-    marginRight: 12,
-    minHeight: 80,
-  },
-  selectedServiceCard: {
-    backgroundColor: "#15507b",
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
-  serviceText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "500",
-    marginLeft: 8,
-  },
-  verticalList: {
-    paddingHorizontal: 20,
-    marginBottom: 30,
-  },
-  doctorCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f9f9f9",
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 12,
-  },
-  doctorImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 30,
-    marginRight: 15,
-  },
-  doctorInfo: {
-    flex: 1,
-  },
-  doctorName: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: COLORS.text,
-    marginBottom: 2,
-  },
-  doctorSpecialty: {
-    color: COLORS.secondaryText,
-    fontSize: 14,
-    marginBottom: 3,
-  },
-  doctorDetails: {
-    fontSize: 13,
-    color: COLORS.secondaryText,
-  },
-  rating: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: COLORS.rating,
-  },
-  noResultsText: {
-    fontSize: 14,
-    color: COLORS.secondaryText,
-    fontStyle: "italic",
-    textAlign: "center",
-    marginVertical: 20,
   },
   appointmentsList: {
     paddingLeft: 20,
@@ -722,6 +594,91 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  quickMenuContainer: {
+    marginTop: 20,
+  },
+  cardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-evenly',
+    marginTop: 10,
+    marginBottom: 30,
+  },
+  dashboardCard: {
+    width: CARD_WIDTH,
+    backgroundColor: COLORS.cardGradientStart,
+    borderRadius: 15,
+    alignItems: 'center',
+    marginBottom: 15,
+    marginHorizontal: CARD_MARGIN / 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3,
+    paddingBottom: 15,
+  },
+  cardImage: {
+    width: CARD_WIDTH,
+    height: CARD_WIDTH * 0.7,
+    borderRadius: 15,
+    marginBottom: 8,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginTop: 6,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  adCarouselContainer: {
+    marginVertical: 15,
+    paddingHorizontal: 20,
+  },
+  adCarouselContent: {
+    paddingRight: 20,
+  },
+  adCard: {
+    width: Dimensions.get("window").width - 40,
+    height: 200,
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+    marginRight: 10,
+  },
+  adImage: {
+    width: '100%',
+    height: '100%',
+  },
+  adText: {
+    position: 'absolute',
+    top: 10,
+    left: 15,
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  dotContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+  activeDot: {
+    backgroundColor: COLORS.primary,
+  },
+  inactiveDot: {
+    backgroundColor: '#ccc',
   },
 });
 

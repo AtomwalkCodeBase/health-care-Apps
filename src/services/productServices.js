@@ -1,84 +1,25 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList, getemployeeList, getequipmentList, userLoginURL, getbookedList, doctorbooking, setuserpin, userTaskList, getTaskCategoryURL, updateTaskURL, doctypelistURL, customerdoclistURL } from "../services/ConstantServies";
+import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList, getemployeeList, getequipmentList, userLoginURL, getbookedList, doctorbooking, setuserpin, userTaskList, getTaskCategoryURL, updateTaskURL, doctypelistURL, customerdoclistURL, getCustomerDetailListURL } from "../services/ConstantServies";
 import { authAxios, authAxiosFilePost, authAxiosPost, authAxiosPosts } from "./HttpMethod";
 
-export function getEmpLeave(leave_type, emp_id, year) {
-  let data = {};
-  if (leave_type) {
-    data['leave_type '] = leave_type;
-  }
-  if (emp_id) {
-    data['emp_id'] = emp_id;
-  }
-  if (year) {
-    data['year'] = year;
-  }
-
-  // console.log('getUserTasks', task_type, userTaskListURL, data)
-  return authAxios(getEmpLeavedata, data)
-}
-
-export function postEmpLeave(leave_type) {
-  let data = {};
-  if (leave_type) {
-    data['leave_data'] = leave_type;
-  }
-  // console.log('Data to be sent:', data);
-  return authAxiosPost(addEmpLeave, data)
-
-}
-
-export function postClaim(claim_data) {
-  let data = {};
-  if (claim_data) {
-    data = claim_data;
-  }
-  // console.log('Data to be sent:', claim_data);
-  return authAxiosFilePost(addClaim, claim_data)
-}
-
-export function postClaimAction(claim_type) {
-  let data = {};
-  if (claim_type) {
-    data['claim_data'] = claim_type;
-  }
-  // console.log('Data to be sent:', data);
-  return authAxiosPost(processClaim, data)
-
-}
-
-// export function getemployelistview() {
-//   let data = {};
-//   return authAxios(getemployeeList)
-// }
 export async function getemployelistview() {
   const url = await getemployeeList(); 
   // let data = payload;
   return authAxios(url);
 }
 
-// export function getequipmentlistview() {
-//   let data = {};
-//   return authAxios(getequipmentList)
-// }
 export async function getequipmentlistview() {
   const url = await getequipmentList(); 
   // let data = payload;
   return authAxios(url);
 }
 
-// export function getbookedlistview() {
-//   let data = {};
-//   return authAxios(getbookedList)
-// }
 export async function getbookedlistview() {
   const url = await getbookedList(); 
   // let data = payload;
   return authAxios(url);
 }
 
-// const FALLBACK_DB_NAME = 'PMA_00001'; // Replace with your default database name
-// const FALLBACK_BOOKING_URL = `https://www.atomwalk.com/api/process_booking_data/${FALLBACK_DB_NAME}/`;
 export async function doctorBookingView(
   customer_id,
   equipment_id,
@@ -215,44 +156,6 @@ export async function doctorBookingView(
   }
 }
 
-export function getEmpClaim(res) {
-  let data = {
-    'call_mode': res
-  };
-
-  // console.log(res)
-  return authAxios(getEmpClaimdata, data)
-}
-
-export function getExpenseItem() {
-  return authAxios(getExpenseItemList)
-}
-
-export function getExpenseProjectList() {
-  return authAxios(getProjectList)
-}
-
-export function getEmpAttendance(res) {
-  let data = {
-    'emp_id': res.emp_id,
-    'month': res.month,
-    'year': res.year
-  };
-  // console.log('Final response data',data)
-  return authAxios(getEmpAttendanceData, data)
-}
-
-export function getEmpHoliday(res) {
-  let data = {
-    'year': res.year
-  };
-  // console.log(data,'Final response data')
-  return authAxios(getEmpHolidayData, data)
-}
-
-// export function getTaskCategory() { 
-//   return authAxios(getTaskCategoryURL)
-// }
 export async function getTaskCategory(payload) {
   const url = await getTaskCategoryURL(); 
   let data = payload;
@@ -329,8 +232,20 @@ export async function getDocTypeListView(payload) {
   return authAxios(url, data);
 }
 
-export async function getCustomerDocListView(payload) {
+export async function getCustomerDocListView(customerId) {
+let data={}
+  if(customerId){
+    data['customer_id']=customerId;
+  }
   const url = await customerdoclistURL(); 
-  let data = payload;
   return authAxios(url, data);
+}
+
+export async function getCustomerDetailList(customerId) {
+  let data={}
+  if(customerId){
+    data['customer_id']=customerId;
+  }
+  const url = await getCustomerDetailListURL();
+  return authAxios(url,data);
 }

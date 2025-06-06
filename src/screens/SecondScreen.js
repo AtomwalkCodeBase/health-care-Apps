@@ -3,7 +3,7 @@ import { View, Text, FlatList, Dimensions } from "react-native";
 import styled from "styled-components/native";
 import InfoCard from "../components/InfoCard";
 import { AppContext } from "../../context/AppContext";
-import { getCompanyInfo, getProfileInfo } from "../services/authServices";
+import { getCompanyInfo } from "../services/authServices";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import ApplyButton from "../components/ApplyButton";

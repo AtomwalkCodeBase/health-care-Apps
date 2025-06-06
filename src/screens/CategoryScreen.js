@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   FlatList,
@@ -15,6 +16,7 @@ import { Audio } from 'expo-av';
 import moment from 'moment';
 import { useRouter } from 'expo-router';
 import Header from '../components/Header';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { getusertasklistview, updateTask } from '../services/productServices';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MiniPlayer from '../components/MiniPlayer';
@@ -52,16 +54,14 @@ const markTaskAsCompleted = async (task, customerId) => {
       id: task.id,
       name: task.name || 'Unnamed Task',
       remarks: task.therapyFor || task.remarks || '',
-      start_time: null, // No start_time in current task data
+      start_time: task.start_time || null,
+      end_time: task.end_time || null,
       task_date: task.date ? moment(task.date, 'YYYY-MM-DD').format('DD-MM-YYYY') : moment().format('DD-MM-YYYY'),
       task_type: task.type ? task.type.toUpperCase() : 'GENERAL',
     };
 
-    // console.log('Marking task as completed:', { task_data, is_completed: 'Y' });
-
     const response = await updateTask(task_data, 'Y');
     await new Promise((resolve) => setTimeout(resolve, 500));
-    // console.log('Task marked as completed successfully:', { taskId: task.id, response });
     return { success: true };
   } catch (error) {
     console.error('Failed to mark task as completed:', error);
@@ -83,6 +83,7 @@ export default function PatientTasks() {
   const [videoTask, setVideoTask] = useState(null);
   const [videoModalVisible, setVideoModalVisible] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [searchText, setSearchText] = useState('');
   const seekingRef = useRef(false);
   const soundRef = useRef(null);
   const appStateRef = useRef(AppState.currentState);
@@ -195,29 +196,12 @@ export default function PatientTasks() {
 
     const formattedDate = moment(apiTask.task_date, 'DD-MM-YYYY').format('YYYY-MM-DD');
 
-    let dose = 'N/A';
     let time = 'N/A';
     if (!hasMedia && apiTask.remarks) {
       const remarksParts = apiTask.remarks.split(' at ');
       if (remarksParts.length === 2) {
-        dose = remarksParts[0];
         time = remarksParts[1];
-      } else {
-        dose = apiTask.dose || 'N/A';
       }
-    }
-
-    // Debug task details for image tasks
-    if (type === 'medicine' && apiTask.task_sub_category_name === 'Image') {
-      // console.log('Image Task Mapped:', {
-      //   id: apiTask.id,
-      //   ref_file: apiTask.ref_file,
-      //   task_sub_category_name: apiTask.task_sub_category_name,
-      //   name: apiTask.name,
-      //   remarks: apiTask.remarks,
-      //   task_date: apiTask.task_date,
-      //   task_status: apiTask.task_status,
-      // });
     }
 
     return {
@@ -228,11 +212,15 @@ export default function PatientTasks() {
       ref_file: apiTask.ref_file || undefined,
       date: formattedDate,
       time: hasMedia ? undefined : time,
+      start_time: apiTask.start_time || 'N/A',
+      end_time: apiTask.end_time || 'N/A',
+      timeRange: apiTask.start_time && apiTask.end_time
+        ? `${moment(apiTask.start_time, 'HH:mm').format('h:mm A')} - ${moment(apiTask.end_time, 'HH:mm').format('h:mm A')}`
+        : 'N/A',
       completed: (apiTask.task_status || '').toLowerCase() === 'completed',
-      dose,
       task_sub_category_name: apiTask.task_sub_category_name,
       ...Object.keys(apiTask).reduce((acc, key) => {
-        if (!['id', 'task_type', 'name', 'remarks', 'ref_file', 'task_date', 'task_status', 'task_sub_category_name'].includes(key)) {
+        if (!['id', 'task_type', 'name', 'remarks', 'ref_file', 'task_date', 'task_status', 'task_sub_category_name', 'start_time', 'end_time'].includes(key)) {
           acc[key] = apiTask[key];
         }
         return acc;
@@ -246,7 +234,6 @@ export default function PatientTasks() {
       const customerId = await AsyncStorage.getItem('Customer_id');
       if (!customerId) throw new Error('Customer ID not found');
       const res = await getusertasklistview('ALL', customerId);
-      // console.log('Fetched Tasks:', res.data);
       const mappedTasks = (res.data || []).map(mapApiTaskToAppTask);
       setTasks(mappedTasks);
       return mappedTasks;
@@ -313,7 +300,6 @@ export default function PatientTasks() {
 
   const handleVideoPress = async (task) => {
     try {
-      // console.log('[PatientTasks] Opening video:', { taskId: task.id, ref_file: task.ref_file });
       if (soundRef.current) {
         const status = await soundRef.current.getStatusAsync();
         if (status.isLoaded && status.isPlaying) {
@@ -340,7 +326,6 @@ export default function PatientTasks() {
   };
 
   const handleVideoClose = useCallback(() => {
-    // console.log('[PatientTasks] handleVideoClose called');
     setVideoTask(null);
     setVideoModalVisible(false);
   }, []);
@@ -383,7 +368,6 @@ export default function PatientTasks() {
 
       await markTaskAsCompleted(task, customerId);
       await fetchTasks();
-      // console.log('Task completion processed for taskId:', task.id);
     } catch (error) {
       console.error('Error in handleCompletePress:', error);
       Alert.alert('Error', error.message || 'Failed to mark task as completed. Please try again.');
@@ -393,7 +377,10 @@ export default function PatientTasks() {
   };
 
   const filteredTasks = tasks.filter(
-    (task) => getDateKey(task.date) === selectedTab
+    (task) =>
+      getDateKey(task.date) === selectedTab &&
+      (searchText.trim() === '' ||
+        task.name.toLowerCase().includes(searchText.trim().toLowerCase()))
   );
 
   return (
@@ -418,6 +405,17 @@ export default function PatientTasks() {
             </TouchableOpacity>
           ))}
         </View>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <MaterialCommunityIcons name="magnify" size={20} color="#777" />
+          <TextInput
+            placeholder="Search tasks..."
+            placeholderTextColor="#999"
+            style={styles.searchInput}
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+        </View>
 
         {error.visible && (
           <Text style={styles.errorText}>{error.message}</Text>
@@ -426,7 +424,12 @@ export default function PatientTasks() {
         {loading ? (
           <ActivityIndicator size="large" color="#2986cc" style={styles.loader} />
         ) : filteredTasks.length === 0 ? (
-          <Text style={styles.noTaskText}>No tasks for this period.</Text>
+          <View style={styles.noTaskContainer}>
+            <MaterialCommunityIcons name="calendar-blank-outline" size={60} color="#999" />
+            <Text style={styles.noTaskText}>
+              {searchText.trim() ? 'No tasks match your search.' : 'No tasks for this period.'}
+            </Text>
+          </View>
         ) : (
           <FlatList
             style={{ flex: 1 }}
@@ -488,7 +491,25 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    paddingBottom: 80,
+  },
+  searchContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 0.5,
+    borderColor: '#9E9E9E',
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginVertical: 10,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 16,
+    color: '#333',
+    paddingVertical: 0,
   },
   tabBar: {
     flexDirection: 'row',
@@ -518,8 +539,14 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 20,
   },
+  noTaskContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 30,
+  },
   noTaskText: {
-    marginTop: 40,
+    marginTop: 10,
     textAlign: 'center',
     color: '#999',
     fontSize: 16,

@@ -15,19 +15,19 @@ const TASK_TYPE_CONFIG = {
   audio: {
     icon: { name: 'musical-notes', library: 'Ionicons', size: 32 },
     hasProgressBar: false,
-    primaryField: 'Therapy for',
+    primaryField: 'Remarks',
     primaryFieldKey: 'therapyFor',
     additionalFields: [
-      { label: 'Time', key: 'time' },
+      { label: 'Time', key: 'timeRange' },
     ],
   },
   video: {
     icon: { name: 'videocam', library: 'Ionicons', size: 32 },
     hasProgressBar: false,
-    primaryField: 'Therapy for',
+    primaryField: 'Remarks',
     primaryFieldKey: 'therapyFor',
     additionalFields: [
-      { label: 'Time', key: 'time' },
+      { label: 'Time', key: 'timeRange' },
     ],
   },
   medicine: {
@@ -36,8 +36,7 @@ const TASK_TYPE_CONFIG = {
     primaryField: 'Medicine for',
     primaryFieldKey: 'therapyFor',
     additionalFields: [
-      { label: 'Dose', key: 'dose' },
-      { label: 'Time', key: 'time' },
+      { label: 'Time', key: 'timeRange' },
     ],
   },
   default: {
@@ -65,17 +64,6 @@ const TaskCard = ({ task, onPlayPress, onVideoPress, onCompletePress, isToday, i
     }
     return null;
   };
-
-  // Debug ref_file when opening modal
-  useEffect(() => {
-    if (imageModalVisible && task.type === 'medicine') {
-      console.log('Image Modal Opened:', {
-        taskId: task.id,
-        ref_file: task.ref_file,
-        task_sub_category_name: task.task_sub_category_name,
-      });
-    }
-  }, [imageModalVisible, task]);
 
   // Validate image URI
   const isValidImageUri = (uri) => {

@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import { setuserpinview } from '../../src/services/productServices';
+import { setUserPinView } from '../../src/services/productServices';
 import { StatusBar } from "expo-status-bar";
 import Header from "../components/Header";
 
@@ -44,7 +44,7 @@ const ChangePinScreen = () => {
     }
 
     try {
-      const response = await setuserpinview(oldPin, newPin);
+      const response = await setUserPinView(oldPin, newPin);
       if (response.status) {
         await AsyncStorage.setItem('userPin', newPin);
         Alert.alert('Success', 'Your PIN has been updated successfully.');

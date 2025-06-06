@@ -1,24 +1,41 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { MaterialCommunityIcons, FontAwesome, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { AppContext } from '../../context/AppContext';
-import { getProfileInfo } from '../services/authServices';
+import { getCustomerDetailList } from '../services/productServices';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../components/Header';
 import { useRouter } from 'expo-router';
-import Animated, { FadeIn, FadeOut, SlideInLeft } from 'react-native-reanimated';
+import Animated, { FadeIn, SlideInLeft } from 'react-native-reanimated';
 import { Switch } from 'react-native';
 import ConfirmationModal from '../components/ConfirmationModal';
 
 const ProfileScreen = () => {
     const { logout } = useContext(AppContext);
-    const [profile, setProfile] = useState({});
+    const [profile, setProfile] = useState([]);
     const [isManager, setIsManager] = useState(false);
     const [userPin, setUserPin] = useState(null);
     const [biometricEnabled, setBiometricEnabled] = useState(false);
     const [isBiometricModalVisible, setIsBiometricModalVisible] = useState(false);
     const [pendingBiometricValue, setPendingBiometricValue] = useState(null);
-    const router = useRouter();
+    const router =useRouter();
+
+    const userdata = async () => {
+        try {
+            const Customer_id = await AsyncStorage.getItem("Customer_id")
+            console.log("customerId", Customer_id)
+            const res = await getCustomerDetailList(Customer_id);
+            console.log("Customer profile data:", res.data);
+            setProfile(Array.isArray(res.data) && res.data.length > 0 ? res.data[0] : {});
+            setIsManager(res.data?.customer_group?.is_manager || false);
+        } catch (error) {
+            console.error("Error fetching customer profile:", error);
+        }
+    };
+
+    useEffect(() => {
+        userdata();
+    }, []);
 
     // Load user pin and biometric setting from AsyncStorage
     useEffect(() => {
@@ -36,64 +53,39 @@ const ProfileScreen = () => {
         fetchUserData();
     }, []);
 
-    useEffect(() => {
-        getProfileInfo().then((res) => {
-            setProfile(res.data);
-            setIsManager(res.data?.user_group?.is_manager || false);
-        });
-    }, []);
-
     const handlePressPassword = () => {
         router.push({ pathname: 'ResetPassword' });
     };
 
-    const handleBack = () => {
-        navigation.goBack();
-    };
-
     const confirmBiometricToggle = async () => {
-    try {
-      setBiometricEnabled(pendingBiometricValue);
-      if (pendingBiometricValue) {
-        await AsyncStorage.setItem('userBiometric', 'true');
-      } else {
-        await AsyncStorage.removeItem('userBiometric');
-      }
-    } catch (error) {
-      console.error('Error updating biometric setting:', error);
-      setBiometricEnabled(!pendingBiometricValue); // Revert on error
-      setError({ visible: true, message: 'Failed to update biometric setting' });
-    } finally {
-      setIsBiometricModalVisible(false);
-      setPendingBiometricValue(null);
-    }
+        try {
+            setBiometricEnabled(pendingBiometricValue);
+            if (pendingBiometricValue) {
+                await AsyncStorage.setItem('userBiometric', 'true');
+            } else {
+                await AsyncStorage.removeItem('userBiometric');
+            }
+        } catch (error) {
+            console.error('Error updating biometric setting:', error);
+            setBiometricEnabled(!pendingBiometricValue); // Revert on error
+            setError({ visible: true, message: 'Failed to update biometric setting' });
+        } finally {
+            setIsBiometricModalVisible(false);
+            setPendingBiometricValue(null);
+        }
     };
 
     // Handle biometric toggle change
-    // const handleBiometricToggle = async (value) => {
-    //     try {
-    //         setBiometricEnabled(value);
-    //         if (value) {
-    //             await AsyncStorage.setItem('userBiometric', 'true');
-    //         } else {
-    //             await AsyncStorage.removeItem('userBiometric'); // Remove key when disabled
-    //         }
-    //     } catch (error) {
-    //         console.error('Error updating biometric setting:', error);
-    //         // Revert state if AsyncStorage fails
-    //         setBiometricEnabled(!value);
-    //     }
-    // };
-const handleBiometricToggle = (value) => {
-    setPendingBiometricValue(value); // Store the intended toggle value
-    setIsBiometricModalVisible(true); // Show confirmation modal
-  };
+    const handleBiometricToggle = (value) => {
+        setPendingBiometricValue(value); // Store the intended toggle value
+        setIsBiometricModalVisible(true); // Show confirmation modal
+    };
 
     // Cancel biometric toggle
-  const cancelBiometricToggle = () => {
-    setIsBiometricModalVisible(false);
-    setPendingBiometricValue(null);
-  };
+    const cancelBiometricToggle = () => {
+        setIsBiometricModalVisible(false);
+        setPendingBiometricValue(null);
+    };
 
     return (
         <View style={styles.container}>
@@ -118,46 +110,8 @@ const handleBiometricToggle = (value) => {
                         style={styles.userName}
                         entering={FadeIn.duration(600)}
                     >
-                        {profile?.emp_data?.name}
+                        {profile?.name}
                     </Animated.Text>
-
-                    {/* Manager Status */}
-                    <Animated.View
-                        style={styles.managerContainer}
-                        entering={SlideInLeft.delay(300)}
-                    >
-                        <Text style={styles.managerText}>Is Manager:</Text>
-                        <MaterialCommunityIcons
-                            name={isManager ? "check-circle" : "cancel"}
-                            size={20}
-                            color={isManager ? "#2a7fba" : "#d9534f"}
-                        />
-                    </Animated.View>
-
-                    {/* Stats Row */}
-                    <View style={styles.statsContainer}>
-                        <Animated.View
-                            style={styles.statItem}
-                            entering={SlideInLeft.delay(400)}
-                        >
-                            <Text style={styles.statValue}>{profile?.age || '--'}</Text>
-                            <Text style={styles.statLabel}>Age</Text>
-                        </Animated.View>
-                        <Animated.View
-                            style={styles.statItem}
-                            entering={SlideInLeft.delay(450)}
-                        >
-                            <Text style={styles.statValue}>{profile?.gender || '--'}</Text>
-                            <Text style={styles.statLabel}>Gender</Text>
-                        </Animated.View>
-                        <Animated.View
-                            style={styles.statItem}
-                            entering={SlideInLeft.delay(500)}
-                        >
-                            <Text style={styles.statValue}>{profile?.blood_group || '--'}</Text>
-                            <Text style={styles.statLabel}>Blood</Text>
-                        </Animated.View>
-                    </View>
                 </Animated.View>
 
                 {/* Main Card */}
@@ -177,51 +131,28 @@ const handleBiometricToggle = (value) => {
                             entering={SlideInLeft.delay(400)}
                         >
                             <Text style={styles.infoLabel}>User ID</Text>
-                            <Text style={styles.infoValue}>{profile?.emp_data?.emp_id || 'Not specified'}</Text>
+                            <Text style={styles.infoValue}>{profile?.id || 'Not specified'}</Text>
+                        </Animated.View>
+                        <Animated.View
+                            style={styles.infoRow}
+                            entering={SlideInLeft.delay(450)}
+                        >
+                            <Text style={styles.infoLabel}>Address</Text>
+                            <Text style={styles.infoValue}>{profile?.address_line_1 || 'Not specified'}</Text>
                         </Animated.View>
                         <Animated.View
                             style={styles.infoRow}
                             entering={SlideInLeft.delay(500)}
                         >
-                            <Text style={styles.infoLabel}>Address</Text>
-                            <Text style={styles.infoValue}>{profile?.address || 'Not specified'}</Text>
+                            <Text style={styles.infoLabel}>Phone</Text>
+                            <Text style={styles.infoValue}>{profile?.mobile_number || 'Not specified'}</Text>
                         </Animated.View>
                         <Animated.View
                             style={styles.infoRow}
                             entering={SlideInLeft.delay(550)}
                         >
-                            <Text style={styles.infoLabel}>Phone</Text>
-                            <Text style={styles.infoValue}>{profile?.mobile_number || 'Not specified'}</Text>
-                        </Animated.View>
-                    </View>
-
-                    {/* Emergency Contact Section */}
-                    <View style={styles.cardSection}>
-                        <View style={styles.sectionHeader}>
-                            <MaterialCommunityIcons name="alert-circle" size={20} color="#ffc433" />
-                            <Text style={styles.sectionTitle}>Emergency Contact</Text>
-                        </View>
-
-                        <Animated.View
-                            style={styles.infoRow}
-                            entering={SlideInLeft.delay(600)}
-                        >
-                            <Text style={styles.infoLabel}>Name</Text>
-                            <Text style={styles.infoValue}>{profile?.emergency_contact?.name || 'Not specified'}</Text>
-                        </Animated.View>
-                        <Animated.View
-                            style={styles.infoRow}
-                            entering={SlideInLeft.delay(650)}
-                        >
-                            <Text style={styles.infoLabel}>Phone</Text>
-                            <Text style={styles.infoValue}>{profile?.emergency_contact?.phone || 'Not specified'}</Text>
-                        </Animated.View>
-                        <Animated.View
-                            style={styles.infoRow}
-                            entering={SlideInLeft.delay(650)}
-                        >
-                            <Text style={styles.infoLabel}>Relationship</Text>
-                            <Text style={styles.infoValue}>{profile?.emergency_contact?.relationship || 'Not specified'}</Text>
+                            <Text style={styles.infoLabel}>Email ID</Text>
+                            <Text style={styles.infoValue}>{profile?.email_id || 'Not specified'}</Text>
                         </Animated.View>
                     </View>
 
@@ -245,7 +176,7 @@ const handleBiometricToggle = (value) => {
                             />
                         </View>
                         <View style={styles.divider} />
-                        {/* Set/Update Pin moved to the top of action items */}
+                        {/* Set/Update Pin */}
                         <TouchableOpacity
                             style={styles.actionItem}
                             onPress={handlePressPassword}
@@ -260,19 +191,6 @@ const handleBiometricToggle = (value) => {
                         </TouchableOpacity>
 
                         <View style={styles.divider} />
-
-                        {/* <TouchableOpacity
-                            style={styles.actionItem}
-                            onPress={() => router.push('/MyAccount')}
-                        >
-                            <View style={styles.actionIcon}>
-                                <MaterialCommunityIcons name="cog" size={20} color="#555" />
-                            </View>
-                            <Text style={styles.actionText}>My Account</Text>
-                            <MaterialCommunityIcons name="chevron-right" size={20} color="#999" />
-                        </TouchableOpacity> */}
-
-                        {/* <View style={styles.divider} /> */}
 
                         <TouchableOpacity
                             style={styles.actionItem}
@@ -447,7 +365,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 10,
-        // paddingHorizontal: 6,
         backgroundColor: "#ffffff"
     },
     optionIconContainer: {
