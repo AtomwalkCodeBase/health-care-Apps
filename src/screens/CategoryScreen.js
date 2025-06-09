@@ -11,6 +11,8 @@ import {
   Alert,
   AppState,
   BackHandler,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { Audio } from 'expo-av';
 import moment from 'moment';
@@ -42,7 +44,6 @@ const getDateKey = (dateString) => {
   return null;
 };
 
-// --- API: Mark as completed ---
 const markTaskAsCompleted = async (task, customerId) => {
   try {
     if (!task?.id) {
@@ -61,6 +62,7 @@ const markTaskAsCompleted = async (task, customerId) => {
     };
 
     const response = await updateTask(task_data, 'Y');
+    console.log('Data task:', response.data);
     await new Promise((resolve) => setTimeout(resolve, 500));
     return { success: true };
   } catch (error) {
@@ -84,17 +86,17 @@ export default function PatientTasks() {
   const [videoModalVisible, setVideoModalVisible] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
   const seekingRef = useRef(false);
   const soundRef = useRef(null);
   const appStateRef = useRef(AppState.currentState);
   const router = useRouter();
 
-  // Debug videoModalVisible changes
   useEffect(() => {
-    // console.log('[PatientTasks] videoModalVisible changed:', videoModalVisible);
+    console.log('[PatientTasks] videoModalVisible changed:', videoModalVisible);
   }, [videoModalVisible]);
 
-  // Initialize audio session
   useEffect(() => {
     const setupAudio = async () => {
       try {
@@ -112,7 +114,6 @@ export default function PatientTasks() {
     setupAudio();
   }, []);
 
-  // Cleanup audio resources
   const cleanupAudio = async () => {
     try {
       if (soundRef.current) {
@@ -131,7 +132,6 @@ export default function PatientTasks() {
     }
   };
 
-  // Handle app state changes
   useEffect(() => {
     const handleAppStateChange = (nextAppState) => {
       if (
@@ -180,7 +180,7 @@ export default function PatientTasks() {
     let type = apiTask.task_category_name?.toLowerCase() || 'default';
     let hasMedia = false;
 
-    if (type === 'ticket' || !TASK_TYPE_CONFIG[type]) {
+    if (type === 'Post_Health' || !TASK_TYPE_CONFIG[type]) {
       if (apiTask.task_sub_category_name) {
         if (apiTask.task_sub_category_name === 'Audio') {
           type = 'audio';
@@ -208,12 +208,12 @@ export default function PatientTasks() {
       id: apiTask.id,
       type,
       name: apiTask.name,
-      therapyFor: apiTask.remarks || 'N/A',
       ref_file: apiTask.ref_file || undefined,
       date: formattedDate,
       time: hasMedia ? undefined : time,
       start_time: apiTask.start_time || 'N/A',
       end_time: apiTask.end_time || 'N/A',
+      therapyFor: apiTask.remarks || 'N/A',
       timeRange: apiTask.start_time && apiTask.end_time
         ? `${moment(apiTask.start_time, 'HH:mm').format('h:mm A')} - ${moment(apiTask.end_time, 'HH:mm').format('h:mm A')}`
         : 'N/A',
@@ -376,6 +376,11 @@ export default function PatientTasks() {
     }
   };
 
+  const handleCardPress = (task) => {
+    setSelectedTask(task);
+    setModalVisible(true);
+  };
+
   const filteredTasks = tasks.filter(
     (task) =>
       getDateKey(task.date) === selectedTab &&
@@ -405,7 +410,6 @@ export default function PatientTasks() {
             </TouchableOpacity>
           ))}
         </View>
-        {/* Search Bar */}
         <View style={styles.searchContainer}>
           <MaterialCommunityIcons name="magnify" size={20} color="#777" />
           <TextInput
@@ -439,6 +443,7 @@ export default function PatientTasks() {
             renderItem={({ item }) => (
               <TaskCard
                 task={item}
+                onPress={() => handleCardPress(item)}
                 onPlayPress={handlePlayPress}
                 onVideoPress={handleVideoPress}
                 onCompletePress={handleCompletePress}
@@ -478,6 +483,48 @@ export default function PatientTasks() {
           visible={videoModalVisible}
           onClose={handleVideoClose}
         />
+      )}
+
+      {selectedTask && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{selectedTask.name || 'Unnamed Task'}</Text>
+                <Pressable
+                  style={styles.closeButton}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <MaterialCommunityIcons name="close" size={24} color="#333" />
+                </Pressable>
+              </View>
+              <View style={styles.modalBody}>
+                <Text style={styles.modalDetail}>
+                  Type: {selectedTask.type || 'N/A'}
+                </Text>
+                <Text style={styles.modalDetail}>
+                  Date: {selectedTask.date || 'N/A'}
+                </Text>
+                <Text style={styles.modalDetail}>
+                  {selectedTask.type === 'audio' || selectedTask.type === 'video'
+                    ? `Time Range: ${selectedTask.timeRange}`
+                    : `Time: ${selectedTask.time}`}
+                </Text>
+                <Text style={styles.modalDetail}>
+                  Status: {selectedTask.completed ? 'Completed' : 'Not Completed'}
+                </Text>
+                <Text style={styles.modalDescription}>
+                  Remarks: {selectedTask.therapyFor || 'N/A'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </Modal>
       )}
     </View>
   );
@@ -569,5 +616,52 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e5e5e5',
     zIndex: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 15,
+    width: '100%',
+    maxWidth: 400,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+    paddingBottom: 10,
+    marginBottom: 10,
+    paddingHorizontal: 8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 2,
+    marginRight: 2,
+  },
+  modalBody: {
+    marginBottom: 8,
+  },
+  modalDetail: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+  },
+  modalDescription: {
+    fontSize: 16,
+    color: '#333',
+    marginTop: 8,
   },
 });

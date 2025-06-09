@@ -73,13 +73,13 @@ const Sidebar = ({ onClose }) => {
           icon="file-document-outline"
           label="My Reports"
           active={activeItem === "My Reports"}
-          onPress={() => handleNavigation("/Reports", "My Reports")}
+          onPress={() => handleNavigation("/ReportMain", "My Reports")}
         />
         <SidebarItem
           icon="clipboard-text-outline"
-          label="My Tasks"
-          active={activeItem === "My Tasks"}
-          onPress={() => handleNavigation("/TaskCategory", "My Tasks")}
+          label="My Activities"
+          active={activeItem === "My Activities"}
+          onPress={() => handleNavigation("/TaskCategory", "My Activities")}
         />
         <SidebarItem
           icon="account-circle"

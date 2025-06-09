@@ -18,11 +18,10 @@ import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityI
 import { getAppointments, subscribeToAppointments, fetchBookedAppointments } from "./MyAppointments";
 import { StatusBar } from "expo-status-bar";
 import Sidebar from "./Sidebar";
-import img1 from "../../assets/images/home01.jpg";
+import img1 from "../../assets/images/home01.png";
 import img2 from "../../assets/images/home02.jpg";
 import img3 from "../../assets/images/home03.jpg";
 import Cimg1 from "../../assets/images/Home_04.jpg";
-import Cimg2 from "../../assets/images/Home_05.jpg";
 import Cimg3 from "../../assets/images/Home_06.jpg";
 import Cimg4 from "../../assets/images/Home_07.jpg";
 
@@ -47,7 +46,7 @@ const STRINGS = {
   greeting: (name) =>
     name ? (name.length > 20 ? `${name.slice(0, 17)}...` : name) : "User",
   searchBase: "Search",
-  searchPhrase: "appointments or profiles",
+  searchPhrase: "appointments...",
   bookNow: "Book Now",
   loading: "Loading data...",
   error: "Failed to load data. Please try again.",
@@ -56,16 +55,15 @@ const STRINGS = {
 };
 
 const AD_IMAGES = [
-  { id: "1", image: img1, title: "Appointments", screen: "/book" },
-  { id: "2", image: img2, title: "Your Tasks", screen: "/TaskCategory" },
-  { id: "3", image: img3, title: "Lab Reports", screen: "/Reports" },
+  { id: "1", image: img1, title: "My Appointments", screen: "/book" },
+  { id: "2", image: img2, title: "My Activities", screen: "/TaskCategory" },
+  { id: "3", image: img3, title: "My Reports", screen: "/ReportMain" },
 ];
 
 const QUICK_MENU_CARDS = [
   { id: "1", title: "Appointments", image: Cimg1, screen: "Appointments"},
-  { id: "4", title: "Tasks", image: Cimg4, screen: "Tasks" },
+  { id: "4", title: "Activities", image: Cimg4, screen: "Activities" },
   { id: "3", title: "Reports", image: Cimg3, screen: "Reports" },
-  { id: "2", title: "Profile", image: Cimg2, screen: "Profile" },
 ];
 
 const HomeScreen = () => {
@@ -179,11 +177,9 @@ const HomeScreen = () => {
   const handleCardPress = (screen) => {
     if (screen === "Appointments") {
       router.push("/book");
-    } else if (screen === "Profile") {
-      router.push("/profile");
     } else if (screen === "Reports") {
-      router.push("/Reports");
-    } else if (screen === "Tasks") {
+      router.push("/ReportMain");
+    } else if (screen === "Activities") {
       router.push("/TaskCategory");
     }
   };
@@ -634,8 +630,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   adCarouselContainer: {
-    marginVertical: 15,
-    paddingHorizontal: 20,
+    marginVertical: 20,
+    paddingHorizontal: 15,
   },
   adCarouselContent: {
     paddingRight: 20,

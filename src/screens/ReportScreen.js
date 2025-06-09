@@ -17,22 +17,38 @@ import { getCustomerDocListView } from "./../services/productServices";
 import * as Linking from "expo-linking";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useLocalSearchParams } from "expo-router";
+
+const REPORT_TYPES = [
+  { key: "all", label: "All Types" },
+  { key: "RX-001", label: "Prescription" },
+  { key: "LAB-001", label: "Lab Report" },
+  { key: "RAD-RPT-001", label: "Radiology Report" },
+  { key: "DS-001", label: "Discharge Summary" },
+  { key: "RAD-IMG-001", label: "Radiology Images" },
+];
 
 const ReportScreen = () => {
+  const { documentCode } = useLocalSearchParams();
+  console.log("Received documentCode in ReportScreen:", documentCode);
+
   const [reports, setReports] = useState([]);
   const [filteredReports, setFilteredReports] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedType, setSelectedType] = useState(documentCode || "all");
+  const [availableTypes, setAvailableTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [expandedDescriptions, setExpandedDescriptions] = useState({});
 
   const fetchReports = async () => {
     try {
       setError(null);
-      const Customer_id = await AsyncStorage.getItem('Customer_id'); 
+      const Customer_id = await AsyncStorage.getItem("Customer_id");
+      if (!Customer_id) throw new Error("Customer ID not found");
       const response = await getCustomerDocListView(Customer_id);
       if (response && response.data) {
-        // Map API fields to match the expected structure
         const mappedReports = response.data.map((item) => ({
           id: item.id,
           title: item.document_name,
@@ -43,13 +59,21 @@ const ReportScreen = () => {
           description: item.remarks || "No remarks provided",
         }));
         setReports(mappedReports);
-        setFilteredReports(mappedReports); // Initialize filtered reports
+        setFilteredReports(mappedReports);
+
+        const uniqueCodes = [...new Set(mappedReports.map((report) => report.document_code))];
+        const available = REPORT_TYPES.filter(
+          (type) => type.key === "all" || uniqueCodes.includes(type.key)
+        );
+        setAvailableTypes(available);
       } else {
         setError("No data received from server");
+        setAvailableTypes([REPORT_TYPES[0]]);
       }
     } catch (err) {
       console.error("Error fetching reports:", err);
       setError("Failed to fetch reports. Please try again later.");
+      setAvailableTypes([REPORT_TYPES[0]]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -60,21 +84,35 @@ const ReportScreen = () => {
     fetchReports();
   }, []);
 
-  // Filter reports based on search query
   useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredReports(reports);
+    if (documentCode && REPORT_TYPES.some((type) => type.key === documentCode)) {
+      setSelectedType(documentCode);
     } else {
-      const filtered = reports.filter((report) =>
+      setSelectedType("all");
+    }
+  }, [documentCode]);
+
+  useEffect(() => {
+    let filtered = reports;
+
+    if (selectedType !== "all") {
+      filtered = filtered.filter((report) => report.document_code === selectedType);
+      // console.log("Filtered reports for selectedType:", selectedType, filtered);
+    }
+
+    if (searchQuery.trim() !== "") {
+      filtered = filtered.filter((report) =>
         report.title.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredReports(filtered);
     }
-  }, [searchQuery, reports]);
+
+    setFilteredReports(filtered);
+  }, [searchQuery, selectedType, reports]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    setSearchQuery(""); // Clear search query on refresh
+    setSearchQuery("");
+    setSelectedType("all");
     fetchReports();
   };
 
@@ -85,14 +123,12 @@ const ReportScreen = () => {
     }
 
     try {
-      // Check if the URL is supported by the device
       const supported = await Linking.canOpenURL(documentFile);
       if (!supported) {
         Alert.alert("Error", "This document type cannot be opened on your device.");
         return;
       }
 
-      // Open the document using the device's default viewer
       await Linking.openURL(documentFile);
     } catch (err) {
       console.error("Error opening document:", err);
@@ -103,24 +139,74 @@ const ReportScreen = () => {
     }
   };
 
-  const renderReport = ({ item }) => (
-    <View style={styles.reportCard}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.reportTitle}>{item.title}</Text>
-        <Text style={styles.reportDetail}>Code: {item.document_code}</Text>
+  const toggleDescription = (reportId) => {
+    setExpandedDescriptions((prev) => ({
+      ...prev,
+      [reportId]: !prev[reportId],
+    }));
+  };
+
+  const renderReport = ({ item }) => {
+    const isExpanded = expandedDescriptions[item.id] || false;
+    const shouldTruncate = item.description.length > 100 && !isExpanded; // Truncate if description is longer than 100 characters
+
+    return (
+      <View style={styles.reportCard}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.reportTitle}>{item.title}</Text>
+          <Text style={styles.reportDetail}>
+            Type: {REPORT_TYPES.find((type) => type.key === item.document_code)?.label || "Unknown"}
+          </Text>
+        </View>
+        <View style={styles.cardBody}>
+          <Text style={styles.reportDate}>Valid From: {item.date}</Text>
+          <Text style={styles.reportDetail}>Valid To: {item.valid_to_date}</Text>
+          <Text
+            style={styles.reportDescription}
+            numberOfLines={shouldTruncate ? 2 : undefined}
+            ellipsizeMode={shouldTruncate ? "tail" : undefined}
+          >
+            {item.description}
+          </Text>
+          {item.description.length > 100 && (
+            <TouchableOpacity
+              style={styles.readMoreButton}
+              onPress={() => toggleDescription(item.id)}
+            >
+              <Text style={styles.readMoreText}>
+                {isExpanded ? "Read Less" : "Read More"}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <TouchableOpacity
+          style={styles.viewButton}
+          onPress={() => handleViewReport(item.document_file)}
+        >
+          <Text style={styles.viewButtonText}>View Report</Text>
+        </TouchableOpacity>
       </View>
-      <View style={styles.cardBody}>
-        <Text style={styles.reportDate}>Valid From: {item.date}</Text>
-        <Text style={styles.reportDetail}>Valid To: {item.valid_to_date}</Text>
-        <Text style={styles.reportDescription}>{item.description}</Text>
-      </View>
-      <TouchableOpacity
-        style={styles.viewButton}
-        onPress={() => handleViewReport(item.document_file)}
+    );
+  };
+
+  const renderTypeCard = ({ item }) => (
+    <TouchableOpacity
+      style={[
+        styles.typeCard,
+        selectedType === item.key && styles.typeCardActive,
+      ]}
+      onPress={() => setSelectedType(item.key)}
+      activeOpacity={0.8}
+    >
+      <Text
+        style={[
+          styles.typeCardText,
+          selectedType === item.key && styles.typeCardTextActive,
+        ]}
       >
-        <Text style={styles.viewButtonText}>View Report</Text>
-      </TouchableOpacity>
-    </View>
+        {item.label}
+      </Text>
+    </TouchableOpacity>
   );
 
   if (loading && !refreshing) {
@@ -139,8 +225,23 @@ const ReportScreen = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#2a7fba" style="light" />
       <Header title="My Reports" showBackButton={true} />
+      <View style={styles.filterContainer}>
+        <FlatList
+          horizontal
+          data={availableTypes}
+          renderItem={renderTypeCard}
+          keyExtractor={(item) => item.key}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.typeCardContainer}
+        />
+      </View>
       <View style={styles.searchContainer}>
-        <MaterialCommunityIcons name="magnify" size={20} color="#777" style={styles.searchIcon} />
+        <MaterialCommunityIcons
+          name="magnify"
+          size={20}
+          color="#777"
+          style={styles.searchIcon}
+        />
         <TextInput
           style={styles.searchInput}
           placeholder="Search reports by name..."
@@ -159,12 +260,14 @@ const ReportScreen = () => {
       ) : filteredReports.length === 0 ? (
         <View style={styles.content}>
           <Text style={styles.title}>
-            {searchQuery ? "No Matching Reports" : "No Reports Found"}
+            {searchQuery || selectedType !== "all" ? "No Matching Reports" : "No Reports Found"}
           </Text>
           <Text style={styles.subtitle}>
-            {searchQuery ? "Try a different search term." : "Add your first lab report!"}
+            {searchQuery || selectedType !== "all"
+              ? "Try a different search term or filter."
+              : "Add your first lab report!"}
           </Text>
-          {!searchQuery && (
+          {!(searchQuery || selectedType !== "all") && (
             <TouchableOpacity style={styles.button}>
               <Text style={styles.buttonText}>ADD A REPORT</Text>
             </TouchableOpacity>
@@ -190,6 +293,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
     marginTop: 30,
+  },
+  filterContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e9ecef",
+  },
+  typeCardContainer: {
+    paddingVertical: 5,
+  },
+  typeCard: {
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#e5e5e5",
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: "#d1d1d1",
+  },
+  typeCardActive: {
+    backgroundColor: "#2a7fba",
+    borderColor: "#2a7fba",
+  },
+  typeCardText: {
+    color: "#333",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  typeCardTextActive: {
+    color: "#fff",
+    fontWeight: "600",
   },
   searchContainer: {
     paddingHorizontal: 16,
@@ -288,6 +423,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     marginBottom: 4,
+  },
+  readMoreButton: {
+    alignSelf: "flex-start",
+    marginTop: 4,
+  },
+  readMoreText: {
+    color: "#2a7fba",
+    fontSize: 14,
+    fontWeight: "600",
   },
   viewButton: {
     backgroundColor: "#2a7fba",

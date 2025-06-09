@@ -18,6 +18,7 @@ export default function RootLayout() {
       <Stack.Screen name="DateTime/index" options={{headerShown:false}}/>
       <Stack.Screen name="BookingConfirmation/index" options={{headerShown:false}}/>
       <Stack.Screen name="Reports/index" options={{headerShown:false}}/>
+      <Stack.Screen name="ReportMain/index" options={{headerShown:false}}/>
       <Stack.Screen name="TaskCategory/index" options={{headerShown:false}}/>
       <Stack.Screen name="AudioTask/index" options={{headerShown:false}}/>
 

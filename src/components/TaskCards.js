@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -47,7 +47,18 @@ const TASK_TYPE_CONFIG = {
   },
 };
 
-const TaskCard = ({ task, onPlayPress, onVideoPress, onCompletePress, isToday, isCurrentTrack, isPlaying, isLoading, isUpdating }) => {
+const TaskCard = ({
+  task,
+  onPress, // Added prop to handle card click
+  onPlayPress,
+  onVideoPress,
+  onCompletePress,
+  isToday,
+  isCurrentTrack,
+  isPlaying,
+  isLoading,
+  isUpdating,
+}) => {
   const config = TASK_TYPE_CONFIG[task.type] || TASK_TYPE_CONFIG.default;
   const isAudio = task.type === 'audio';
   const isVideo = task.type === 'video';
@@ -65,29 +76,38 @@ const TaskCard = ({ task, onPlayPress, onVideoPress, onCompletePress, isToday, i
     return null;
   };
 
-  // Validate image URI
   const isValidImageUri = (uri) => {
     if (!uri || typeof uri !== 'string' || uri.trim() === '') return false;
     return uri.match(/\.(png|jpg|jpeg|svg|pvg)$/i) || uri.startsWith('http');
   };
 
-  const handleVideoConfirm = () => {
+  const handleVideoConfirm = (e) => {
+    e.stopPropagation(); // Prevent card onPress from firing
     setVideoConfirmVisible(false);
     onVideoPress(task);
   };
 
-  const handleCompleteConfirm = () => {
+  const handleCompleteConfirm = (e) => {
+    e.stopPropagation(); // Prevent card onPress from firing
     setCompleteConfirmVisible(true);
     onCompletePress(task);
     setCompleteConfirmVisible(false);
   };
 
   return (
-    <View style={[styles.card, isAudio && styles.audioCard, isVideo && styles.videoCard]}>
+    <TouchableOpacity
+      style={[styles.card, isAudio && styles.audioCard, isVideo && styles.videoCard]}
+      onPress={onPress} // Make the entire card clickable
+      activeOpacity={0.8}
+    >
       <View style={styles.cardIconWrap}>{renderIcon()}</View>
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle}>{task.name}</Text>
-        <Text style={styles.cardSubtitle}>
+        <Text
+          style={styles.cardSubtitle}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
           {config.primaryField}: {task[config.primaryFieldKey] || 'N/A'}
         </Text>
         {config.additionalFields?.map((field) => (
@@ -120,7 +140,10 @@ const TaskCard = ({ task, onPlayPress, onVideoPress, onCompletePress, isToday, i
             ) : (
               <TouchableOpacity
                 style={[styles.completeButton, (isAudio || isVideo) && styles.mediaCompleteButton]}
-                onPress={() => setCompleteConfirmVisible(true)}
+                onPress={(e) => {
+                  e.stopPropagation(); // Prevent card onPress from firing
+                  setCompleteConfirmVisible(true);
+                }}
                 disabled={isUpdating}
               >
                 {isUpdating ? (
@@ -133,7 +156,10 @@ const TaskCard = ({ task, onPlayPress, onVideoPress, onCompletePress, isToday, i
             {task.type === 'medicine' && task.ref_file && task.task_sub_category_name === 'Image' && (
               <TouchableOpacity
                 style={styles.iconButton}
-                onPress={() => setImageModalVisible(true)}
+                onPress={(e) => {
+                  e.stopPropagation(); // Prevent card onPress from firing
+                  setImageModalVisible(true);
+                }}
               >
                 <Ionicons name="image" size={24} color="#fff" />
               </TouchableOpacity>
@@ -141,7 +167,10 @@ const TaskCard = ({ task, onPlayPress, onVideoPress, onCompletePress, isToday, i
             {isVideo && (
               <TouchableOpacity
                 style={styles.iconButton}
-                onPress={() => setVideoConfirmVisible(true)}
+                onPress={(e) => {
+                  e.stopPropagation(); // Prevent card onPress from firing
+                  setVideoConfirmVisible(true);
+                }}
               >
                 <Ionicons name="videocam" size={24} color="#fff" />
               </TouchableOpacity>
@@ -149,7 +178,10 @@ const TaskCard = ({ task, onPlayPress, onVideoPress, onCompletePress, isToday, i
             {isAudio && (
               <TouchableOpacity
                 style={[styles.iconButton, (isAudio || isVideo) && styles.mediaIconButton]}
-                onPress={() => onPlayPress(task)}
+                onPress={(e) => {
+                  e.stopPropagation(); // Prevent card onPress from firing
+                  onPlayPress(task);
+                }}
                 disabled={isLoading && isCurrentTrack}
               >
                 <Ionicons
@@ -178,7 +210,10 @@ const TaskCard = ({ task, onPlayPress, onVideoPress, onCompletePress, isToday, i
           <View style={styles.modalContent}>
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setImageModalVisible(false)}
+              onPress={(e) => {
+                e.stopPropagation(); // Prevent modal container onPress from firing
+                setImageModalVisible(false);
+              }}
             >
               <Ionicons name="close-circle" size={30} color="#ff4d4d" />
             </TouchableOpacity>
@@ -228,7 +263,10 @@ const TaskCard = ({ task, onPlayPress, onVideoPress, onCompletePress, isToday, i
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.confirmButton, styles.confirmButtonNo]}
-                onPress={() => setVideoConfirmVisible(false)}
+                onPress={(e) => {
+                  e.stopPropagation(); // Prevent card onPress from firing
+                  setVideoConfirmVisible(false);
+                }}
               >
                 <Text style={styles.confirmButtonText}>No</Text>
               </TouchableOpacity>
@@ -253,15 +291,16 @@ const TaskCard = ({ task, onPlayPress, onVideoPress, onCompletePress, isToday, i
             <View style={styles.confirmModalButtons}>
               <TouchableOpacity
                 style={[styles.confirmButton, styles.confirmButtonYes]}
-                onPress={() => {
-                  handleCompleteConfirm();
-                }}
+                onPress={handleCompleteConfirm}
               >
                 <Text style={styles.confirmButtonText}>Yes</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.confirmButton, styles.confirmButtonNo]}
-                onPress={() => setCompleteConfirmVisible(false)}
+                onPress={(e) => {
+                  e.stopPropagation(); // Prevent card onPress from firing
+                  setCompleteConfirmVisible(false);
+                }}
               >
                 <Text style={styles.confirmButtonText}>No</Text>
               </TouchableOpacity>
@@ -269,7 +308,7 @@ const TaskCard = ({ task, onPlayPress, onVideoPress, onCompletePress, isToday, i
           </View>
         </View>
       </Modal>
-    </View>
+    </TouchableOpacity>
   );
 };
 
