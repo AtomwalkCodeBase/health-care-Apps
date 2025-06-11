@@ -30,8 +30,6 @@ const REPORT_TYPES = [
 
 const ReportScreen = () => {
   const { documentCode } = useLocalSearchParams();
-  console.log("Received documentCode in ReportScreen:", documentCode);
-
   const [reports, setReports] = useState([]);
   const [filteredReports, setFilteredReports] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");

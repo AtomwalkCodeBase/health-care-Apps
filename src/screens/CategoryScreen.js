@@ -239,7 +239,7 @@ export default function PatientTasks() {
       return mappedTasks;
     } catch (error) {
       console.error('Fetch tasks error:', error);
-      setError({ visible: true, message: 'Failed to load tasks. Please try again.' });
+      setError({ visible: true, message: 'Failed to load Activities. Please try again.' });
       setTasks([]);
       return [];
     } finally {
@@ -391,7 +391,7 @@ export default function PatientTasks() {
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#2a7fba" barStyle="light-content" />
-      <Header title="My Tasks" onBack={handleBack} />
+      <Header title="My Activities" onBack={handleBack} />
 
       <View style={styles.contentContainer}>
         <View style={styles.tabBar}>
@@ -413,7 +413,7 @@ export default function PatientTasks() {
         <View style={styles.searchContainer}>
           <MaterialCommunityIcons name="magnify" size={20} color="#777" />
           <TextInput
-            placeholder="Search tasks..."
+            placeholder="Search Activities..."
             placeholderTextColor="#999"
             style={styles.searchInput}
             value={searchText}
@@ -431,7 +431,7 @@ export default function PatientTasks() {
           <View style={styles.noTaskContainer}>
             <MaterialCommunityIcons name="calendar-blank-outline" size={60} color="#999" />
             <Text style={styles.noTaskText}>
-              {searchText.trim() ? 'No tasks match your search.' : 'No tasks for this period.'}
+              {searchText.trim() ? 'No Activities match your search.' : 'No Activities for this period.'}
             </Text>
           </View>
         ) : (
@@ -464,7 +464,7 @@ export default function PatientTasks() {
             sound={sound}
             track={{
               ...currentTrack,
-              title: currentTrack.name || 'Audio Task',
+              title: currentTrack.name || 'Audio Aactivity',
               artist: `Therapy: ${currentTrack.therapyFor || 'N/A'}`,
               artwork: require('../../assets/images/waveform.png'),
             }}
@@ -495,7 +495,7 @@ export default function PatientTasks() {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{selectedTask.name || 'Unnamed Task'}</Text>
+                <Text style={styles.modalTitle}>{selectedTask.name || 'Unnamed Aactivity'}</Text>
                 <Pressable
                   style={styles.closeButton}
                   onPress={() => setModalVisible(false)}
