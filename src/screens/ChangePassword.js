@@ -74,7 +74,7 @@ const ChangePinScreen = () => {
             placeholder="Old PIN"
             secureTextEntry
             keyboardType="numeric"
-            maxLength={4}
+            maxLength={6}
             value={oldPin}
             onChangeText={setOldPin}
             placeholderTextColor="#bbb"
@@ -83,7 +83,7 @@ const ChangePinScreen = () => {
             style={styles.input}
             placeholder="New PIN"
             keyboardType="numeric"
-            maxLength={4}
+            maxLength={6}
             value={newPin}
             onChangeText={setNewPin}
             secureTextEntry
@@ -93,7 +93,7 @@ const ChangePinScreen = () => {
             style={styles.input}
             placeholder="Confirm New PIN"
             keyboardType="numeric"
-            maxLength={4}
+            maxLength={6}
             value={confirmPin}
             onChangeText={setConfirmPin}
             secureTextEntry

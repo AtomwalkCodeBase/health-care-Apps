@@ -19,7 +19,7 @@ import moment from 'moment';
 import { useRouter } from 'expo-router';
 import Header from '../components/Header';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import { getusertasklistview, updateTask } from '../services/productServices';
+import { getTaskCategory, getusertasklistview, updateTask } from '../services/productServices';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MiniPlayer from '../components/MiniPlayer';
 import VideoPlayer from '../components/VideoPlayer';
@@ -511,9 +511,7 @@ export default function PatientTasks() {
                   Date: {selectedTask.date || 'N/A'}
                 </Text>
                 <Text style={styles.modalDetail}>
-                  {selectedTask.type === 'audio' || selectedTask.type === 'video'
-                    ? `Time Range: ${selectedTask.timeRange}`
-                    : `Time: ${selectedTask.time}`}
+                  Time: {selectedTask.timeRange || ' N/A'}
                 </Text>
                 <Text style={styles.modalDetail}>
                   Status: {selectedTask.completed ? 'Completed' : 'Not Completed'}

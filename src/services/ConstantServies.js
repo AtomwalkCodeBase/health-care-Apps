@@ -59,6 +59,11 @@ export const getCustomerDetailListURL = async () => {
   return `${newendpoint}/customer_detail_list/${db_name}/`;
 }
 
+export const companyInfoURL = async () => {
+  const db_name = await getDbName();
+  return `${endpoint}/company_info/${db_name}/`;
+};
+
 export const getemployeeList = async () => {
  const db_name = await getDbName();
   return `${endpoint}/get_employee_list/${db_name}/`;
@@ -126,6 +131,11 @@ export const doctypelistURL = async () => {
 export const customerdoclistURL = async () => {
   const db_name = await getDbName();
  return  `${newendpoint}/get_customer_document_list/${db_name}/`;
+}
+
+export const forgetCustomerPinURL =  async () => {
+  const db_name = await getDbName();
+  return `${newendpoint}/customer_forget_pin/${db_name}/`;
 }
 
 export const getDbList = `${endpoint}/get_applicable_site/`;

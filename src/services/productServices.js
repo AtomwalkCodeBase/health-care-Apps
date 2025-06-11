@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList, getemployeeList, getequipmentList, userLoginURL, getbookedList, doctorbooking, setuserpin, userTaskList, getTaskCategoryURL, updateTaskURL, doctypelistURL, customerdoclistURL, getCustomerDetailListURL } from "../services/ConstantServies";
-import { authAxios, authAxiosFilePost, authAxiosPost, authAxiosPosts } from "./HttpMethod";
+import { addEmpLeave, getEmpLeavedata, addClaim, getEmpClaimdata, getExpenseItemList, getProjectList, getEmpAttendanceData, getEmpHolidayData, empCheckData, processClaim, getClaimApproverList, getemployeeList, getequipmentList, userLoginURL, getbookedList, doctorbooking, setuserpin, userTaskList, getTaskCategoryURL, updateTaskURL, doctypelistURL, customerdoclistURL, getCustomerDetailListURL, forgetCustomerPinURL } from "../services/ConstantServies";
+import { authAxios, authAxiosFilePost, authAxiosPost, authAxiosPosts, publicAxiosRequest } from "./HttpMethod";
 
 export async function getemployelistview() {
   const url = await getemployeeList(); 
@@ -248,4 +248,10 @@ export async function getCustomerDetailList(customerId) {
   }
   const url = await getCustomerDetailListURL();
   return authAxios(url,data);
+}
+
+export async function forgetCustomerPinView(data) {
+    console.log("Data to be sent--->", data);
+    const url = await forgetCustomerPinURL();
+    return publicAxiosRequest.post(url, data);
 }

@@ -52,6 +52,7 @@ const STRINGS = {
   error: "Failed to load data. Please try again.",
   appointmentLoading: "Loading appointments...",
   quickMenu: "Quick Menu",
+  noAppointments: "No appointments match your search.",
 };
 
 const AD_IMAGES = [
@@ -208,6 +209,18 @@ const HomeScreen = () => {
     return () => clearInterval(interval);
   }, [currentAdIndex]);
 
+  // Filter upcoming appointments based on searchText
+  const filteredAppointments = appointments.upcoming.filter((appointment) => {
+    const searchLower = searchText.trim().toLowerCase();
+    if (!searchLower) return true; // Show all if search is empty
+    return (
+      appointment.doctorName?.toLowerCase().includes(searchLower) ||
+      appointment.specialty?.toLowerCase().includes(searchLower) ||
+      appointment.date?.toLowerCase().includes(searchLower) ||
+      appointment.time?.toLowerCase().includes(searchLower)
+    );
+  });
+
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
@@ -305,13 +318,13 @@ const HomeScreen = () => {
               <ActivityIndicator size="small" color={COLORS.primary} />
               <Text style={styles.sectionLoadingText}>{STRINGS.appointmentLoading}</Text>
             </View>
-          ) : (
-            appointments.upcoming?.length > 0 && (
-              <View>
-                <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
+          ) : appointments.upcoming?.length > 0 ? (
+            <View>
+              <Text style={styles.sectionTitle}>Upcoming Appointments</Text>
+              {filteredAppointments.length > 0 ? (
                 <FlatList
                   horizontal
-                  data={appointments.upcoming}
+                  data={filteredAppointments}
                   renderItem={({ item }) => (
                     <TouchableOpacity 
                       style={styles.appointmentCard}
@@ -340,9 +353,14 @@ const HomeScreen = () => {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.appointmentsList}
                 />
-              </View>
-            )
-          )}
+              ) : (
+                <View style={styles.noAppointmentsContainer}>
+                  <MaterialCommunityIcons name="calendar-blank-outline" size={40} color="#999" />
+                  <Text style={styles.noAppointmentsText}>{STRINGS.noAppointments}</Text>
+                </View>
+              )}
+            </View>
+          ) : null}
           <View style={styles.adCarouselContainer}>
             <FlatList
               ref={flatListRef}
@@ -675,6 +693,17 @@ const styles = StyleSheet.create({
   },
   inactiveDot: {
     backgroundColor: '#ccc',
+  },
+  noAppointmentsContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  noAppointmentsText: {
+    marginTop: 10,
+    color: COLORS.secondaryText,
+    fontSize: 16,
+    textAlign: 'center',
   },
 });
 

@@ -1,13 +1,15 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { publicAxiosRequest } from "../src/services/HttpMethod";
+// import { publicAxiosRequest } from "../src/services/HttpMethod";
 // import { customerLogin } from "../src/services/ConstantServies";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCompanyInfo } from '../src/services/authServices';
 import { useRouter } from 'expo-router';
 import NetInfo from '@react-native-community/netinfo';
-// import NetworkErrorModal from '../src/components/NetworkErrorModal';
+import NetworkErrorModal from '../src/components/NetworkErrorModal';
+import { publicAxiosRequest } from '../src/services/HttpMethod';
 import { userLoginURL } from '../src/services/ConstantServies';
-import NetworkErrorModal from '../src/components/NetworkErrorModal'
+// import { customerLogin } from '../src/services/productServices';
+// import { userLoginURL } from '../src/services/ConstantServices';
 
 const AppContext = createContext();
 
@@ -79,10 +81,43 @@ const AppProvider = ({ children }) => {
               await AsyncStorage.setItem('userPin', password);
                 }
 
-                router.replace({ pathname: 'home' });
+                router.replace('/home');
         } catch (err) {
             console.log('Login error:', err);
           }
+          
+        // try {
+        //     if (!username.includes("@")) {
+        //         const userDetailResponse = await axios.get(`https://www.atomwalk.com/api/get_user_detail/?user_id=${username}`);
+        //         username = userDetailResponse.data.username;
+        //     }
+        //     const res = await publicAxiosRequest.post(loginURL, { username, password });
+        //     const userToken = res.data['key'];
+        //     await AsyncStorage.multiSet([
+        //         ['userToken', userToken],
+        //         ['Password', password],
+        //         ['username', username],
+        //     ]);
+        //     setUserToken(userToken);
+        //     router.replace({ pathname: 'home' });
+        // } catch (err) {
+        //     console.log('Login error:', err);
+        // }
+
+        // try {
+        //     const res = await getCompanyInfo();
+        //     const companyInfo = res.data;
+        //     const db_name = companyInfo.db_name.substr(3);
+        //     await AsyncStorage.multiSet([
+        //         ['companyInfo', JSON.stringify(companyInfo)],
+        //         ['dbName', db_name],
+        //     ]);
+        //     setCompanyInfo(companyInfo);
+        //     setDbName(db_name);
+        // } catch (error) {
+        //     console.log('Company Info Fetch Error:', error);
+        // }
+
         setIsLoading(false);
     };
 
@@ -158,7 +193,7 @@ const AppProvider = ({ children }) => {
             setIsLoading
         }}>
             {children}
-            <NetworkErrorModal
+            <NetworkErrorModal 
                 visible={!isConnected} 
                 onRetry={onRetry} 
                 onNetworkRestore={() => setIsConnected(true)} 
