@@ -388,7 +388,7 @@ useEffect(() => {
           />
         )}
         
-                      <InputLabel>Enter your Mobile number or Emp ID</InputLabel>
+                      <InputLabel>Enter your Mobile number </InputLabel>
                       <InputWrapper>
           <MaterialIcons name="person" size={20} color="#6c757d" />
                         <Input
@@ -400,7 +400,7 @@ useEffect(() => {
                           maxLength={10}
                         />
                       </InputWrapper>
-                      <InputLabel>Enter your PIN (min 4 digits)</InputLabel>
+                      <InputLabel>Enter your PIN</InputLabel>
                       <InputWrapper>
           <MaterialIcons name="lock-outline" size={20} color="#6c757d" />
                         <Input
