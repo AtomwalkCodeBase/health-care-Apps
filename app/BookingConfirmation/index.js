@@ -33,24 +33,33 @@ const BookingConfirmation = () => {
       return "01-01-1970";
     }
     try {
-      const [dayAbbr, dayNum, monthAbbr] = dateString.split(" ");
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const monthIndex = months.indexOf(monthAbbr);
-      
-      if (monthIndex === -1) throw new Error("Invalid month abbreviation");
-
-      const today = new Date();
-      const year = today.getFullYear();
-      const selectedDate = new Date(year, monthIndex, parseInt(dayNum));
-      
-      // If date is in past, move to next year
-      if (selectedDate < today && today.getMonth() === monthIndex) {
-        selectedDate.setFullYear(year + 1);
+      // If the date is already in DD-MM-YYYY format, return it
+      if (dateString.match(/^\d{2}-\d{2}-\d{4}$/)) {
+        return dateString;
       }
-      
-      const formattedDay = String(selectedDate.getDate()).padStart(2, "0");
-      const formattedMonth = String(selectedDate.getMonth() + 1).padStart(2, "0");
-      return `${formattedDay}-${formattedMonth}-${selectedDate.getFullYear()}`;
+
+      // If the date is in YYYY-MM-DD format, convert it to DD-MM-YYYY
+      if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const [year, month, day] = dateString.split('-');
+        return `${day}-${month}-${year}`;
+      }
+
+      // If the date is in the format "Day DD Mon YYYY" (e.g., "Mon 16 Jun 2025")
+      const parts = dateString.split(" ");
+      if (parts.length >= 4) {
+        const [dayAbbr, dayNum, monthAbbr, year] = parts;
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthIndex = months.indexOf(monthAbbr);
+        
+        if (monthIndex === -1) throw new Error("Invalid month abbreviation");
+        if (!year) throw new Error("Year is missing");
+
+        const formattedDay = String(parseInt(dayNum)).padStart(2, "0");
+        const formattedMonth = String(monthIndex + 1).padStart(2, "0");
+        return `${formattedDay}-${formattedMonth}-${year}`;
+      }
+
+      throw new Error("Invalid date format");
     } catch (error) {
       console.error("Error formatting date:", error);
       return "01-01-1970";
@@ -131,16 +140,11 @@ const BookingConfirmation = () => {
       
       if (dayIndex === -1 || monthIndex === -1) throw new Error("Invalid date format");
 
-      const today = new Date();
-      const year = today.getFullYear();
+      // Always use 2025 as the year
+      const year = 2025;
       const date = new Date(year, monthIndex, parseInt(dayNum));
       
-      // If date is in past, move to next year
-      if (date < today && today.getMonth() === monthIndex) {
-        date.setFullYear(year + 1);
-      }
-      
-      return `${days[dayIndex]}, ${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]} ${date.getFullYear()}`;
+      return `${days[dayIndex]}, ${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]} ${year}`;
     } catch (error) {
       console.error("Error formatting display date:", error);
       return dateString || "Invalid date";
@@ -210,7 +214,7 @@ const BookingConfirmation = () => {
     try {
       // Validate and prepare parameters
       const [startTime, endTime] = params.time ? params.time.split(" - ") : ["12:00 am", "13:00 pm"];
-      const bookingDate = formatDateForAPI(params.date) || "01-01-1970";
+      const bookingDate = formatDateForAPI(params.fullDate) || "01-01-1970";
       const formattedStartTime = formatTimeForAPI(startTime) || "12:00 am";
       const formattedEndTime = formatTimeForAPI(endTime) || "13:00 pm";
       const duration = calculateDuration(startTime, endTime) || 1.0;

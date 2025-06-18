@@ -18,6 +18,7 @@ import Header from '../components/Header';
 import * as Calendar from 'expo-calendar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getbookedlistview, doctorBookingView } from "../services/productServices";
+import moment from 'moment';
 
 const COLORS = {
   primary: '#2196F3',
@@ -68,33 +69,38 @@ const normalizeTime = (startTime, endTime) => {
 const formatDate = (dateString) => {
   if (!dateString) return "Invalid Date";
 
-  if (dateString.includes('-')) {
-    const [day, month, year] = dateString.split('-').map(Number);
-    if (!day || !month || !year) return dateString;
-    
-    const date = new Date(year, month - 1, day);
-    if (isNaN(date.getTime())) return dateString;
-    
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    
-    return `${days[date.getDay()]}, ${day.toString().padStart(2, '0')} ${months[date.getMonth()]} ${year}`;
-  }
+  try {
+    // If the date is already in the formatted string format, return it
+    if (dateString.includes(',')) {
+      return dateString;
+    }
 
-  return dateString;
+    // Parse the date from DD-MM-YYYY format
+    if (dateString.includes('-')) {
+      const [day, month, year] = dateString.split('-').map(Number);
+      if (!day || !month || !year) return dateString;
+      
+      const date = new Date(year, month - 1, day);
+      if (isNaN(date.getTime())) return dateString;
+      
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      
+      return `${days[date.getDay()]}, ${day.toString().padStart(2, '0')} ${months[date.getMonth()]} ${year}`;
+    }
+
+    return dateString;
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return dateString;
+  }
 };
 
 const parseFullDate = (dateStr) => {
   if (!dateStr) return null;
   
   try {
-    if (dateStr.includes('-')) {
-      const [day, month, year] = dateStr.split('-').map(Number);
-      if (day && month && year) {
-        return new Date(year, month - 1, day);
-      }
-    }
-    
+    // If the date is in the formatted string format (e.g., "Monday, 16 June 2025")
     if (dateStr.includes(',')) {
       const [, rest] = dateStr.split(', ');
       const [day, monthName, year] = rest.split(' ');
@@ -102,7 +108,15 @@ const parseFullDate = (dateStr) => {
                      "July", "August", "September", "October", "November", "December"];
       const monthIndex = months.indexOf(monthName);
       if (monthIndex !== -1 && day && year) {
-        return new Date(year, monthIndex, parseInt(day));
+        return new Date(parseInt(year), monthIndex, parseInt(day));
+      }
+    }
+    
+    // If the date is in DD-MM-YYYY format
+    if (dateStr.includes('-')) {
+      const [day, month, year] = dateStr.split('-').map(Number);
+      if (day && month && year) {
+        return new Date(year, month - 1, day);
       }
     }
     
@@ -116,21 +130,26 @@ const parseFullDate = (dateStr) => {
 const parseDateTimeForComparison = (dateString, timeString) => {
   if (!dateString || !timeString) return null;
 
-  const date = parseFullDate(dateString);
-  if (!date) return null;
+  try {
+    const date = parseFullDate(dateString);
+    if (!date) return null;
 
-  const match = timeString.match(/(\d+:\d+)([AP]M)?/i);
-  if (!match) return null;
+    const match = timeString.match(/(\d+:\d+)([AP]M)?/i);
+    if (!match) return null;
 
-  const [time, period] = match.slice(1);
-  let [hours, minutes] = time.split(':').map(Number);
-  if (period) {
-    if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
-    if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
+    const [time, period] = match.slice(1);
+    let [hours, minutes] = time.split(':').map(Number);
+    if (period) {
+      if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+      if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
+    }
+
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  } catch (error) {
+    console.error('Error parsing date time for comparison:', error);
+    return null;
   }
-
-  date.setHours(hours, minutes, 0, 0);
-  return date;
 };
 
 const parseDateTime = (dateString, timeString) => {
@@ -237,8 +256,6 @@ export const fetchBookedAppointments = async () => {
     }
     
     const response = await getbookedlistview(parseInt(customerId));
-    console.log("getbookedlistview Response:", JSON.stringify(response, null, 2));
-
     const apiData = response.data || response;
     
     if (!apiData) {
@@ -246,8 +263,7 @@ export const fetchBookedAppointments = async () => {
     }
 
     const bookingsArray = Array.isArray(apiData) ? apiData : [apiData];
-
-    const currentDateTime = new Date();
+    const now = moment();
 
     const appointments = {
       upcoming: [],
@@ -266,7 +282,7 @@ export const fetchBookedAppointments = async () => {
         return;
       }
       
-      const bookingDate = parseFullDate(booking.booking_date);
+      const bookingDate = booking.booking_date;
       const status = booking.status_display?.toLowerCase() || 'booked';
       
       const appointment = {
@@ -274,7 +290,7 @@ export const fetchBookedAppointments = async () => {
         booking_id: booking.booking_id?.toString() || booking.id?.toString(),
         doctorName: booking.equipment_data.name || 'Unknown Doctor',
         specialty: booking.equipment_data.equipment_type || 'Unknown Specialty',
-        date: booking.booking_date || new Date().toISOString().split('T')[0],
+        date: bookingDate,
         time: normalizeTime(booking.start_time, booking.end_time),
         image: booking.equipment_data.image || "https://via.placeholder.com/100",
         status: status,
@@ -293,8 +309,26 @@ export const fetchBookedAppointments = async () => {
       if (status === 'cancelled') {
         appointments.cancelled.push(appointment);
       } else {
-        const appointmentDateTime = parseDateTimeForComparison(booking.booking_date, booking.start_time);
-        if (appointmentDateTime && appointmentDateTime < currentDateTime) {
+        const [day, month, year] = bookingDate.split('-').map(Number);
+        const bookingMoment = moment(`${year}-${month}-${day}`, 'YYYY-M-D');
+        
+        const timeMatch = booking.start_time.match(/(\d+):(\d+)([AP]M)?/i);
+        if (timeMatch) {
+          let [_, hours, minutes, period] = timeMatch;
+          hours = parseInt(hours);
+          minutes = parseInt(minutes);
+          
+          if (period) {
+            if (period.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+            if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
+          }
+          
+          bookingMoment.set({ hours, minutes, seconds: 0 });
+        }
+
+        const isBefore = bookingMoment.isBefore(now);
+        
+        if (isBefore) {
           appointments.past.push(appointment);
         } else {
           appointments.upcoming.push(appointment);
@@ -302,95 +336,47 @@ export const fetchBookedAppointments = async () => {
       }
     });
 
-    // Sort upcoming appointments by date and time (closest to current date/time first, ascending)
-    appointments.upcoming.sort((a, b) => {
-      const dateA = parseFullDate(a.date);
-      const dateB = parseFullDate(b.date);
+    const sortAppointments = (appointments) => {
+      return appointments.sort((a, b) => {
+        const [dayA, monthA, yearA] = a.date.split('-').map(Number);
+        const [dayB, monthB, yearB] = b.date.split('-').map(Number);
+        
+        const dateA = moment(`${yearA}-${monthA}-${dayA}`, 'YYYY-M-D');
+        const dateB = moment(`${yearB}-${monthB}-${dayB}`, 'YYYY-M-D');
 
-      if (!dateA || !dateB) return 0;
+        if (!dateA.isValid() || !dateB.isValid()) {
+          return 0;
+        }
 
-      const timeA = a.start_time?.match(/(\d+:\d+)([AP]M)?/i);
-      const timeB = b.start_time?.match(/(\d+:\d+)([AP]M)?/i);
+        const timeA = a.start_time?.match(/(\d+:\d+)([AP]M)?/i);
+        const timeB = b.start_time?.match(/(\d+:\d+)([AP]M)?/i);
 
-      if (!timeA || !timeB) return dateA - dateB;
+        if (!timeA || !timeB) {
+          return dateA.diff(dateB);
+        }
 
-      let [hoursA, minutesA] = timeA[1].split(':').map(Number);
-      let [hoursB, minutesB] = timeB[1].split(':').map(Number);
+        let [hoursA, minutesA] = timeA[1].split(':').map(Number);
+        let [hoursB, minutesB] = timeB[1].split(':').map(Number);
 
-      if (timeA[2]) {
-        if (timeA[2].toUpperCase() === 'PM' && hoursA !== 12) hoursA += 12;
-        if (timeA[2].toUpperCase() === 'AM' && hoursA === 12) hoursA = 0;
-      }
-      if (timeB[2]) {
-        if (timeB[2].toUpperCase() === 'PM' && hoursB !== 12) hoursB += 12;
-        if (timeB[2].toUpperCase() === 'AM' && hoursB === 12) hoursB = 0;
-      }
+        if (timeA[2]) {
+          if (timeA[2].toUpperCase() === 'PM' && hoursA !== 12) hoursA += 12;
+          if (timeA[2].toUpperCase() === 'AM' && hoursA === 12) hoursA = 0;
+        }
+        if (timeB[2]) {
+          if (timeB[2].toUpperCase() === 'PM' && hoursB !== 12) hoursB += 12;
+          if (timeB[2].toUpperCase() === 'AM' && hoursB === 12) hoursB = 0;
+        }
 
-      dateA.setHours(hoursA, minutesA, 0, 0);
-      dateB.setHours(hoursB, minutesB, 0, 0);
+        dateA.set({ hours: hoursA, minutes: minutesA, seconds: 0 });
+        dateB.set({ hours: hoursB, minutes: minutesB, seconds: 0 });
 
-      return dateA - dateB;
-    });
+        return dateA.diff(dateB);
+      });
+    };
 
-    // Sort past appointments by date and time (most recent first, descending)
-    appointments.past.sort((a, b) => {
-      const dateA = parseFullDate(a.date);
-      const dateB = parseFullDate(b.date);
-
-      if (!dateA || !dateB) return 0;
-
-      const timeA = a.start_time?.match(/(\d+:\d+)([AP]M)?/i);
-      const timeB = b.start_time?.match(/(\d+:\d+)([AP]M)?/i);
-
-      if (!timeA || !timeB) return dateB - dateA;
-
-      let [hoursA, minutesA] = timeA[1].split(':').map(Number);
-      let [hoursB, minutesB] = timeB[1].split(':').map(Number);
-
-      if (timeA[2]) {
-        if (timeA[2].toUpperCase() === 'PM' && hoursA !== 12) hoursA += 12;
-        if (timeA[2].toUpperCase() === 'AM' && hoursA === 12) hoursA = 0;
-      }
-      if (timeB[2]) {
-        if (timeB[2].toUpperCase() === 'PM' && hoursB !== 12) hoursB += 12;
-        if (timeB[2].toUpperCase() === 'AM' && hoursB === 12) hoursB = 0;
-      }
-
-      dateA.setHours(hoursA, minutesA, 0, 0);
-      dateB.setHours(hoursB, minutesB, 0, 0);
-
-      return dateB - dateA;
-    });
-
-    // Sort cancelled appointments by date and time (most recent first, descending)
-    appointments.cancelled.sort((a, b) => {
-      const dateA = parseFullDate(a.date);
-      const dateB = parseFullDate(b.date);
-
-      if (!dateA || !dateB) return 0;
-
-      const timeA = a.start_time?.match(/(\d+:\d+)([AP]M)?/i);
-      const timeB = b.start_time?.match(/(\d+:\d+)([AP]M)?/i);
-
-      if (!timeA || !timeB) return dateB - dateA;
-
-      let [hoursA, minutesA] = timeA[1].split(':').map(Number);
-      let [hoursB, minutesB] = timeB[1].split(':').map(Number);
-
-      if (timeA[2]) {
-        if (timeA[2].toUpperCase() === 'PM' && hoursA !== 12) hoursA += 12;
-        if (timeA[2].toUpperCase() === 'AM' && hoursA === 12) hoursA = 0;
-      }
-      if (timeB[2]) {
-        if (timeB[2].toUpperCase() === 'PM' && hoursB !== 12) hoursB += 12;
-        if (timeB[2].toUpperCase() === 'AM' && hoursB === 12) hoursB = 0;
-      }
-
-      dateA.setHours(hoursA, minutesA, 0, 0);
-      dateB.setHours(hoursB, minutesB, 0, 0);
-
-      return dateB - dateA;
-    });
+    appointments.upcoming = sortAppointments(appointments.upcoming);
+    appointments.past = sortAppointments(appointments.past).reverse();
+    appointments.cancelled = sortAppointments(appointments.cancelled).reverse();
 
     appointmentsState = appointments;
     notifyListeners();
@@ -670,6 +656,10 @@ export default function MyAppointments() {
     if (rescheduleClick) {
       const appointment = appointments.upcoming.find(a => a.id === data);
       if (appointment) {
+        const formattedDate = appointment.date.includes(',') ? 
+          moment(parseFullDate(appointment.date)).format('DD-MM-YYYY') : 
+          appointment.date;
+
         router.push({
           pathname: "/DateTime",
           params: {
@@ -681,7 +671,7 @@ export default function MyAppointments() {
             startTime: appointment.start_time,
             endTime: appointment.end_time,
             duration: appointment.duration,
-            date: appointment.date,
+            date: formattedDate,
             time: appointment.time,
             isReschedule: true,
           },
@@ -699,10 +689,31 @@ export default function MyAppointments() {
   };
 
   const handleUpdate = (appointmentId) => {
-    setModalVisible(true);
-    setData(appointmentId);
-    setCancelClick(false);
-    setRescheduleClick(true);
+    const appointment = appointments.upcoming.find(a => a.id === appointmentId);
+    if (appointment) {
+      const formattedDate = appointment.date.includes(',') ? 
+        moment(parseFullDate(appointment.date)).format('DD-MM-YYYY') : 
+        appointment.date;
+
+      router.push({
+        pathname: "/DateTime",
+        params: {
+          booking_id: appointment.booking_id,
+          id: appointment.doctor_id,
+          name: appointment.doctorName,
+          specialty: appointment.specialty,
+          image: appointment.image,
+          startTime: appointment.start_time,
+          endTime: appointment.end_time,
+          duration: appointment.duration,
+          date: formattedDate,
+          time: appointment.time,
+          isReschedule: true,
+        },
+      });
+    }
+    setModalVisible(false);
+    setRescheduleClick(false);
   };
 
   const handleCancel = (appointmentId) => {

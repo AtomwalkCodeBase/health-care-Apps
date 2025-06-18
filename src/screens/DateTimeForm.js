@@ -71,8 +71,9 @@ const DateTimeForm = () => {
       const dayName = days[date.day()];
       const dayNum = date.date();
       const month = months[date.month()];
+      const year = date.year();
       return {
-        display: `${dayName} ${dayNum} ${month}`,
+        display: `${dayName} ${dayNum} ${month} ${year}`,
         fullDate: date.format('YYYY-MM-DD'),
         formattedDate: date.format('DD-MM-YYYY'),
         dateObj: date.toDate()
@@ -90,6 +91,8 @@ const DateTimeForm = () => {
     const slots = [];
     const start = moment.tz(startTime, 'HH:mm', TIMEZONE);
     const maxTime = moment.tz(maxSlotTime, 'HH:mm', TIMEZONE);
+    const now = moment().tz(TIMEZONE);
+    const isToday = moment(selectedFullDate).isSame(now, 'day');
     
     let currentTime = start.clone();
 
@@ -99,12 +102,15 @@ const DateTimeForm = () => {
 
       if (slotStart.isSameOrAfter(maxTime)) break;
 
+      // Check if the slot is in the past for today's date
+      const isPastSlot = isToday && slotStart.isBefore(now);
+
       slots.push({
         start: slotStart.format('h:mmA'),
         end: slotEnd.format('h:mmA'),
         start24: slotStart.format('HH:mm'),
         end24: slotEnd.format('HH:mm'),
-        status: "Available"
+        status: isPastSlot ? "Unavailable" : "Available"
       });
 
       currentTime = slotEnd;
@@ -210,15 +216,24 @@ const DateTimeForm = () => {
   }, [doctor.id, selectedFullDate, doctor.startTime, doctor.minUsagePeriod, doctor.numSlots, doctor.maxSlotTime, loadingEquipment, isReschedule, params.booking_id]);
 
   const handleTimeSelection = (slot) => {
-    if (slot.status === "Booked") return;
+    if (slot.status === "Booked" || slot.status === "Unavailable") return;
     setSelectedTime(selectedTime === slot.start ? null : slot.start);
   };
 
   const handleCalendarSelect = (day) => {
+    console.log("\n=== Calendar Selection ===");
+    console.log("Selected day:", day);
+    
     const selectedDate = moment.tz(day.dateString, 'YYYY-MM-DD', TIMEZONE);
     const today = moment().tz(TIMEZONE).startOf('day');
     
-    if (selectedDate.isBefore(today)) return;
+    console.log("Selected date:", selectedDate.format('YYYY-MM-DD'));
+    console.log("Today's date:", today.format('YYYY-MM-DD'));
+    
+    if (selectedDate.isBefore(today)) {
+      console.log("Selected date is in the past, ignoring selection");
+      return;
+    }
 
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -232,6 +247,8 @@ const DateTimeForm = () => {
       };
     });
 
+    console.log("Generated week dates:", newDates);
+
     setDates(newDates);
     setSelectedDate(newDates[0].display);
     setSelectedFullDate(newDates[0].fullDate);
@@ -240,10 +257,20 @@ const DateTimeForm = () => {
   };
 
   const handleDateSelection = (dateObj) => {
+    console.log("\n=== Date Selection ===");
+    console.log("Selected date object:", dateObj);
+    
     const selectedDate = moment.tz(dateObj.fullDate, 'YYYY-MM-DD', TIMEZONE);
     const today = moment().tz(TIMEZONE).startOf('day');
     
-    if (selectedDate.isBefore(today)) return;
+    console.log("Selected date:", selectedDate.format('YYYY-MM-DD'));
+    console.log("Today's date:", today.format('YYYY-MM-DD'));
+    
+    if (selectedDate.isBefore(today)) {
+      console.log("Selected date is in the past, ignoring selection");
+      return;
+    }
+    
     setSelectedDate(dateObj.display);
     setSelectedFullDate(dateObj.fullDate);
     setSelectedTime(null);
@@ -254,13 +281,27 @@ const DateTimeForm = () => {
     setIsSubmitting(true);
 
     const slot = timeSlots.find(s => s.start === selectedTime);
+    
+    // Use the actual selected date without any year manipulation
+    const formattedDate = moment(selectedFullDate).format('YYYY-MM-DD');
+    
+    console.log("\n=== Booking Submission ===");
+    console.log("Selected Full Date:", selectedFullDate);
+    console.log("Formatted Date for API:", formattedDate);
+    console.log("Selected Time Slot:", {
+      start: slot.start,
+      end: slot.end,
+      start24: slot.start24,
+      end24: slot.end24
+    });
+    
     const bookingData = {
       doctorId: doctor.id,
       doctorName: doctor.name,
       specialty: doctor.specialty,
       image: doctor.image,
       date: selectedDate,
-      fullDate: selectedFullDate,
+      fullDate: formattedDate,
       time: `${slot.start} - ${slot.end}`,
       startTime: slot.start24,
       endTime: slot.end24,
@@ -269,6 +310,8 @@ const DateTimeForm = () => {
       booking_id: isReschedule ? params.booking_id : undefined,
       isReschedule: isReschedule,
     };
+
+    console.log("Final Booking Data:", bookingData);
 
     router.push({
       pathname: "/BookingConfirmation",
@@ -351,18 +394,20 @@ const DateTimeForm = () => {
             key={`${slot.start}-${index}`}
             style={[
               styles.timeSlot,
-              selectedTime === slot.start && slot.status !== "Booked" && styles.selectedTimeSlot,
+              selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeSlot,
               slot.status === "Booked" && styles.bookedTimeSlot,
+              slot.status === "Unavailable" && styles.unavailableTimeSlot,
               slot.status === "Current" && styles.currentTimeSlot,
             ]}
             onPress={() => handleTimeSelection(slot)}
-            disabled={slot.status === "Booked"}
+            disabled={slot.status === "Booked" || slot.status === "Unavailable"}
           >
             <Text
               style={[
                 styles.timeRangeText,
-                selectedTime === slot.start && slot.status !== "Booked" && styles.selectedTimeText,
+                selectedTime === slot.start && slot.status === "Available" && styles.selectedTimeText,
                 slot.status === "Booked" && styles.bookedTimeText,
+                slot.status === "Unavailable" && styles.unavailableTimeText,
                 slot.status === "Current" && styles.currentTimeText,
               ]}
             >
@@ -373,6 +418,7 @@ const DateTimeForm = () => {
                 styles.statusBadge,
                 slot.status === "Available" ? styles.availableBadge :
                 slot.status === "Current" ? styles.currentBadge :
+                slot.status === "Unavailable" ? styles.unavailableBadge :
                 styles.bookedBadge
               ]}
             >
@@ -572,6 +618,7 @@ const styles = StyleSheet.create({
   selectedTimeSlot: { backgroundColor: "#2a7fba", borderColor: "#2a7fba" },
   bookedTimeSlot: { backgroundColor: "#EAEAEA", borderColor: "#e0e0e0" },
   currentTimeSlot: { backgroundColor: "#FFF3E0", borderColor: "#FFB300" },
+  unavailableTimeSlot: { backgroundColor: "#F5F5F5", borderColor: "#E0E0E0" },
   timeRangeText: {
     fontSize: 14,
     color: "#666",
@@ -582,10 +629,12 @@ const styles = StyleSheet.create({
   selectedTimeText: { color: "#ffffff" },
   bookedTimeText: { color: "#999" },
   currentTimeText: { color: "#FFB300" },
+  unavailableTimeText: { color: "#999" },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginTop: 4 },
   availableBadge: { backgroundColor: "#E8F5E9" },
   bookedBadge: { backgroundColor: "#DBDBDB" },
   currentBadge: { backgroundColor: "#FFF3E0" },
+  unavailableBadge: { backgroundColor: "#F5F5F5" },
   statusText: { fontSize: 12, fontWeight: "500", color: "#2c3e50" },
   bookButton: {
     position: "absolute",
